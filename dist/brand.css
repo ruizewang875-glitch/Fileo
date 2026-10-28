@@ -1,0 +1,61 @@
+@font-face {
+  font-family: "FILEO Grotesk";
+  src: url("assets/fonts/SpaceGrotesk-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+  padding: 2px 0;
+}
+
+.brand-lockup {
+  display: block;
+  width: 144px;
+  height: 33px;
+}
+
+.slogan {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  column-gap: .3em;
+  row-gap: 0;
+  font-family: "FILEO Grotesk", "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(26px, 2.15vw, 33px);
+  font-weight: 500;
+  font-synthesis: none;
+  font-feature-settings: "kern" 1, "liga" 1;
+  letter-spacing: -.055em;
+  line-height: 1.22;
+  color: #39323f;
+}
+
+.slogan-order, .slogan-motion { white-space: nowrap; }
+.slogan-order { font-weight: 500; }
+.slogan-motion { font-weight: 400; letter-spacing: -.045em; }
+.slogan em { color: #8c4268; font-style: normal; }
+
+@media (min-width: 1700px) {
+  .slogan { font-size: 35px; }
+}
+@media (max-height: 780px) and (min-width: 701px) {
+  .slogan { font-size: 28px; }
+}
+@media (max-width: 700px) {
+  .brand-lockup { width: 116px; height: 26.6px; }
+  .slogan { font-size: 24px; column-gap: .3em; letter-spacing: -.055em; }
+}
+@media (max-width: 440px) {
+  .brand-lockup { width: 104px; height: 23.8px; }
+  .slogan { font-size: 22px; max-width: 320px; line-height: 1.25; }
+}
+@media (max-width: 380px) {
+  .brand-lockup { width: 96px; height: 22px; }
+  .slogan { font-size: 21px; }
+}

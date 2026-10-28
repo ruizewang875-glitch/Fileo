@@ -1,0 +1,52 @@
+/* Account → assistant → upload. The assistant is a small, living light source. */
+.site-header .header-actions{gap:14px}
+.site-header .assistant-button{position:relative;isolation:isolate;display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border:1px solid #c6b2cf;border-radius:50%;color:#fff8ff;background:#352940;box-shadow:inset 0 0 0 1px #ffffff35,0 3px 10px #66507421;backdrop-filter:blur(12px);transition:transform .22s,box-shadow .22s,border-color .22s}
+.site-header .assistant-button::before{content:"";position:absolute;z-index:-1;inset:-6px;border-radius:50%;background:conic-gradient(from 20deg,#9d83dc,#d896b2,#91b5cd,#9d83dc);filter:blur(9px);opacity:.36;animation:assistant-glow 6s ease-in-out infinite}
+.site-header .assistant-button .assistant-orb{position:absolute;inset:1px;width:auto;height:auto;overflow:hidden;border-radius:50%;background:#51405d}
+.site-header .assistant-button .assistant-orb::before{content:"";position:absolute;inset:-45%;background:conic-gradient(from 35deg,#443451 0deg,#a186cc 85deg,#e7a8bd 145deg,#7364a6 205deg,#86b7c8 275deg,#443451 360deg);animation:assistant-flow 9s linear infinite}
+.site-header .assistant-button .assistant-orb::after{content:"";position:absolute;inset:0;border-radius:50%;background:radial-gradient(ellipse at 32% 18%,#ffffff38,transparent 55%),linear-gradient(135deg,#30223e14,#241b3b5c);box-shadow:inset 0 1px 2px #ffffff78,inset 0 -3px 7px #1c153e35}
+.assistant-symbol{position:relative;z-index:1;width:24px;height:24px;filter:drop-shadow(0 1px 2px #24153840);transition:transform .22s}
+.site-header .assistant-button:hover{color:#fff;border-color:#b492c9;background:#352940;box-shadow:0 0 0 4px #c8afd824,0 6px 18px #8a629f26;transform:translateY(-1px)}
+.site-header .assistant-button:hover .assistant-symbol{transform:scale(1.07)}
+.site-header .header-upload-button{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;gap:9px;min-height:44px;padding:0 16px;border:1px solid #d5c5d8;border-radius:11px;color:#67486e;background:linear-gradient(120deg,#f8edf2bd,#eeedf8c9);box-shadow:inset 0 1px 0 #ffffffd9,0 3px 9px #65466d09;font-size:13px;font-weight:400;white-space:nowrap;transition:background .2s,border-color .2s,box-shadow .2s,transform .2s}
+.header-upload-button [data-icon]{display:flex;width:18px;height:18px}
+.header-upload-button svg{width:18px;height:18px;stroke-width:1.7}
+.site-header .header-upload-button:hover{color:#783b60;border-color:#bd9dbb;background:linear-gradient(120deg,#f4e2edd9,#e9e6f6e6);box-shadow:inset 0 1px 0 #fff,0 5px 14px #8d5b8b14;transform:translateY(-1px)}
+@keyframes assistant-flow{to{transform:rotate(360deg)}}
+@keyframes assistant-glow{0%,100%{transform:scale(.92);opacity:.3}50%{transform:scale(1.12);opacity:.53}}
+@media(max-width:1100px){.site-header .header-actions{gap:10px}.site-header .header-upload-button{padding:0 13px}}
+@media(max-width:850px){.site-header .header-actions{gap:8px}.site-header .header-upload-button{padding:0 12px;font-size:12px}.site-header .assistant-button{width:40px;height:40px;min-width:40px;min-height:40px;flex-basis:40px}}
+@media(max-width:460px){.site-header .brand-lockup{width:119px}.site-header .header-actions{gap:6px}.site-header .header-upload-button{padding:0 10px;gap:6px;min-height:40px;font-size:12px}.site-header .assistant-button{width:38px;height:38px;min-width:38px;min-height:38px;flex-basis:38px}.assistant-symbol{width:22px;height:22px}.site-header .account-button{width:36px;height:40px;padding:2px}.header-upload-button [data-icon],.header-upload-button svg{width:16px;height:16px}}
+@media(max-width:380px){.site-header{padding-left:16px;padding-right:16px}.site-header .brand-lockup{width:102px}.site-header .header-actions{gap:4px}.site-header .header-upload-button{padding:0 8px}}
+@media(prefers-reduced-motion:reduce){.site-header .assistant-button .assistant-orb::before,.site-header .assistant-button::before{animation:none}.site-header .assistant-button,.assistant-symbol,.site-header .header-upload-button{transition:none}.site-header .assistant-button:hover,.site-header .assistant-button:hover .assistant-symbol,.site-header .header-upload-button:hover{transform:none}}
+
+/* The floating files lead; supporting actions stay separate and quiet. */
+.home-view .stage-control.playback{top:auto;bottom:18px;right:14px}
+.home-workspace-actions{display:flex;justify-content:center;align-items:center;width:100%;max-width:790px;margin:0 auto 22px;gap:0}
+.home-workspace-actions .resume-card{display:flex;flex:0 1 auto;align-items:center;justify-content:center;flex-wrap:nowrap;width:auto;max-width:100%;padding:0;margin:0;gap:12px;border:0;border-radius:0;background:transparent;box-shadow:none}
+.home-workspace-actions .resume-orbit{width:30px;height:30px;font-size:10px;color:#8b7b93;background:conic-gradient(#a58aad var(--progress),#e8e1eb 0)}
+.home-workspace-actions .resume-orbit:before{inset:3px;background:var(--canvas)}
+.home-workspace-actions #resume-percent{display:none}
+.home-workspace-actions #resume-title{display:none}
+.home-workspace-actions .resume-card>div:nth-child(2){display:block;min-width:0}
+.home-workspace-actions .resume-card #resume-detail{display:block;color:#93849b;font-size:13px;line-height:1.5}
+.home-workspace-actions .resume-card #resume-button{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;gap:13px;min-height:38px;margin:0 0 0 6px;padding:7px 13px;color:#8d5d7b;border:0;border-radius:7px;background:transparent;box-shadow:none;font-size:13px;font-weight:400}
+.home-workspace-actions .resume-card #resume-button:hover{color:#7c365d;background:#eee4ed8c}
+.home-workspace-actions .resume-card #resume-button>span{font-size:18px;line-height:1}
+.home-view.has-workspace .slogan{margin-bottom:18px}
+@media(max-width:1100px){
+ .home-view .stage-control.playback{right:8px;bottom:9px}
+}
+@media(max-width:700px){
+ .home-view .stage-control.playback{right:0;bottom:4px}
+ .home-workspace-actions{margin-bottom:20px;max-width:100%;flex-wrap:nowrap}
+ .home-workspace-actions .resume-card{display:flex;flex:0 1 auto;flex-basis:auto;width:auto;padding:0;gap:10px;flex-wrap:nowrap}
+ .home-workspace-actions .resume-card #resume-button{min-width:0;width:auto;padding:7px 9px;gap:8px;margin-left:3px}
+ .home-workspace-actions .resume-card #resume-detail{font-size:12px}
+}
+@media(max-width:460px){
+ .home-workspace-actions .resume-card{display:flex;flex-wrap:wrap;column-gap:9px;row-gap:0;max-width:330px}
+ .home-workspace-actions .resume-orbit{width:26px;height:26px}
+ .home-workspace-actions .resume-card #resume-button{grid-column:auto;min-width:0;min-height:36px;margin:0;font-size:12px;flex-basis:100%;padding:3px 10px}
+ .home-workspace-actions .resume-card #resume-detail{font-size:12px}
+}

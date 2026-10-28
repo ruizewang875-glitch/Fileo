@@ -7,6 +7,8 @@ A desktop web prototype for organizing creative files through two project-scoped
 - **Quick Clear** prioritizes efficiency. A storage/file-count ring shows the project's AI suggestion mix. The file list ranks pending Trash recommendations first, then Archive, Undecided and Keep; completed decisions move below pending work. The first three pending files receive priority markers. Select individual files, all visible files or suggested Trash files, check compact previews, then archive or move the selection to recoverable Trash.
 - **Explore & Decide** prioritizes control. Floating cards lead into a file type within the selected project. Browse large previews, filter by AI suggestion, open details, select up to three files for comparison, or review a selected sequence at your own pace. Pin meaningful files and use Keep, Archive, Trash or clarification to make a decision.
 
+Quick Clear opens with a short staged overview: total storage, file-category preparation, synchronized numbers, then the file list. The 2.5-second presentation runs on entry or project changes, never on filtering or batch decisions, and respects reduced-motion preferences. It visualizes the prototype state rather than scanning the disk.
+
 The project dropdown is shared by both modes. Mode and project choices persist on this browser; returning through the homepage opens the last mode. File decisions, pinned files, review position, analysis progress and history also survive reload and local sign-out. AI recommendations remain distinct from the user's decisions.
 
 **History** opens from the concealed side drawer. It shows project actions and supports undo/restore. Older actions cannot overwrite newer decisions on the same files; undo the latest affected action first.

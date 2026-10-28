@@ -133,7 +133,8 @@ function renderRoute(){
  const focused=['import','analysis','review'].includes(route.page);document.body.dataset.focus=String(focused);document.body.dataset.page=route.page;
  $('#flow-exit').hidden=!focused;$('#flow-stepper').hidden=!focused;$$('[data-step]').forEach(el=>el.setAttribute('aria-current',el.dataset.step===route.page?'step':'false'));
  for(const id of ['home','quick','browse','import','analysis','review'])$('#'+id+'-view').hidden=id==='home'?!['home','explore'].includes(route.page):id!==route.page;
- if(['home','explore'].includes(route.page))renderHome();if(route.page==='quick')quickUI.render();if(route.page==='browse')exploreUI.render(route);
+ if(route.page!=='quick')quickUI.deactivate();
+ if(['home','explore'].includes(route.page))renderHome();if(route.page==='quick')quickUI.render({enter:lastPage!=='quick'});if(route.page==='browse')exploreUI.render(route);
  if(route.page==='import'){$('#import-project-name').value=state().session.project||'My project';renderQueue();}
  if(route.page==='analysis'){analysisPaused=false;startAnalysis();}if(route.page==='review')renderReview();
  syncHeader();syncContext();carousel.resetClock();document.title=({home:'Files in order. Ideas in motion.',quick:'Quick Clear',explore:'Explore & Decide',browse:'Explore files',import:'Add files',analysis:'Preparing suggestions',review:'Explore & Decide'}[route.page])+' — FILEO';

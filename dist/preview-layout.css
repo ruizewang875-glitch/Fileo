@@ -42,15 +42,20 @@
 @media(max-width:700px){.file-card .card-art{padding:49px 4px 3px;bottom:42px}}
 @media(max-height:680px){:root{--preview-max-height:41svh}}
 
-/* Keep the actual pixels out of rounded corners; file controls belong in the
-   caption, even for artwork whose content runs right to the edge. */
+/* Keep actual preview pixels out of rounded corners. */
 :is(.qc-thumbnail,.explore-mini,.queue-thumbnail,.activity-event-thumbnail){padding:3px}
 .explore-card-art,.explore-detail-art,.explore-compare-art,.review-art{padding:6px}
 :is(.qc-preview-art,.preview-art):has(>img){padding:4px}
 .preview-dialog>.close-button{position:relative;inset:auto;display:grid;place-items:center;width:32px;height:32px;margin:8px 12px 5px auto}
 .explore-entry-row{display:flex;align-items:center;gap:8px;min-width:0}
-.explore-entry-row .explore-select,.explore-entry-row .explore-pinned{position:relative;inset:auto;flex:none}
-.explore-entry-row .explore-select>span{border-color:#c9bece}
+.explore-entry-row .explore-pinned{position:relative;inset:auto;flex:none}
+/* The native checkbox gets a generous hit area; its visible mark sits 13px
+   in from both edges, above the separate file-opening surface. */
+.explore-card-image>.explore-select{top:4px;left:4px;width:44px;height:44px}
+.explore-card-image>.explore-select>span{width:26px;height:26px;box-sizing:border-box;pointer-events:none;background:#fcfafb;border-color:#87738b;box-shadow:0 1px 4px #33243738,0 0 0 1px #ffffffa6}
+.explore-card-image>.explore-select>input:checked+span{background:#79537b;border-color:#79537b;color:#fff}
+.explore-card-image>.explore-select>input:focus-visible+span{outline:3px solid #593762;outline-offset:2px;box-shadow:0 0 0 3px #fff}
+@media(forced-colors:active){.explore-card-image>.explore-select>span{forced-color-adjust:none;background:Canvas;border-color:ButtonText;color:transparent}.explore-card-image>.explore-select>input:checked+span{background:Highlight;color:HighlightText;border-color:Highlight}.explore-card-image>.explore-select>input:focus-visible+span{outline-color:Highlight}}
 .explore-entry-row .explore-card-name{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0;flex:1}
 .explore-filename{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .explore-entry-row .explore-card-enter{position:static;flex:none;width:18px;height:18px;border:0;background:none;backdrop-filter:none;color:#87758e;opacity:1;transform:none;font-size:14px}

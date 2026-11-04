@@ -1,13 +1,40 @@
 /* Activity is a readable event history. Recovery stays a secondary action. */
-.activity-page .activity-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;max-width:780px;margin:0 0 36px}
-.activity-stat-card{display:flex;align-items:center;justify-content:space-between;gap:22px;min-height:88px;padding:19px 23px;border:1px solid #e0d9e5;border-radius:14px;background:linear-gradient(125deg,#ffffffc2,#f4f0f7a1);color:#675373;text-decoration:none;box-shadow:0 3px 12px #54415e04;transition:border-color .18s,background .18s,transform .18s}
-.activity-stat-card>span{font-size:15px;font-weight:500;line-height:1.3}
-.activity-stat-card>strong{font:500 30px/1.1 "FILEO Grotesk",sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-1px;color:#493a53}
-.activity-stat-card[data-decision=keep]{border-left:3px solid #96b8af}
-.activity-stat-card[data-decision=archive]{border-left:3px solid #b5a1cb}
-.activity-stat-card[data-decision=trash]{border-left:3px solid #c89baa}
-.activity-stat-card:hover{background:#fff;border-color:#bba9c6;transform:translateY(-1px)}
-.activity-stat-card:focus-visible,.activity-event-file:focus-visible,.activity-undo:focus-visible{outline:2px solid var(--action,#943b63);outline-offset:4px}
+/* One compact rail for jumping to files; the event log remains the focus. */
+.history-drawer .activity-summary{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;
+ padding:3px;margin:0 0 25px;border:1px solid #e5dde7;border-radius:14px;
+ background:#fdfcfb;
+}
+.history-drawer .activity-stat-card{
+ position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;
+ align-content:center;align-items:center;justify-items:start;column-gap:7px;row-gap:2px;
+ min-width:0;min-height:66px;padding:8px 10px;border-radius:10px;
+ color:#3f3348;text-decoration:none;transition:background-color .16s;
+}
+.activity-stat-card[data-decision=keep]{--mark-ink:#397365;--mark-bg:#e2eee8;--cell-hover:#eff5f1}
+.activity-stat-card[data-decision=archive]{--mark-ink:#775a92;--mark-bg:#ede5f6;--cell-hover:#f5f0f8}
+.activity-stat-card[data-decision=trash]{--mark-ink:#985873;--mark-bg:#f5e4ec;--cell-hover:#f9f0f4}
+.activity-stat-card+.activity-stat-card::before{
+ content:"";position:absolute;left:-2px;top:12px;bottom:12px;width:1px;background:#e6dfe8;
+}
+.history-status-mark{
+ height:24px;width:24px;grid-column:1;grid-row:1;display:grid;place-items:center;
+ border-radius:8px;background:var(--mark-bg);color:var(--mark-ink);
+}
+.history-status-mark svg{width:17px;height:17px}
+.history-status-label{grid-row:2;grid-column:1/-1;font-size:13px;line-height:1.4;font-weight:500}
+.activity-stat-card>strong{
+ grid-row:1;grid-column:2;font:500 22px/1.16 "FILEO Grotesk",sans-serif;
+ letter-spacing:-.6px;font-variant-numeric:tabular-nums;
+}
+.activity-stat-card:is(:hover,:focus-visible){background:var(--cell-hover)}
+.activity-stat-card:focus-visible{outline:2px solid var(--mark-ink);outline-offset:-2px}
+.activity-event-file:focus-visible,.activity-undo:focus-visible{outline:2px solid var(--action,#943b63);outline-offset:4px}
+@media(max-width:370px){
+ .history-drawer .activity-stat-card{column-gap:5px;padding-inline:6px}
+ .history-status-mark{width:21px;height:21px;border-radius:6px}
+ .activity-stat-card>strong{font-size:20px}
+}
 .activity-day{margin:0 0 30px}
 .activity-day-label{margin:0;padding:0 0 13px;font-size:14px;font-weight:500;color:#87728f;border-bottom:1px solid #ddd4e3;line-height:1.5}
 .activity-events{list-style:none;margin:0;padding:0}
@@ -32,11 +59,9 @@
 .activity-empty h2{font-size:22px;font-weight:500;color:#574260;margin:0 0 20px;letter-spacing:-.4px}
 .activity-empty .secondary-button{display:inline-flex;min-height:44px;align-items:center;font-size:14px;text-decoration:none}
 @media(max-width:800px){
- .activity-page .activity-summary{gap:12px;margin-bottom:29px}.activity-stat-card{min-height:80px;padding:17px 18px;gap:12px}.activity-stat-card>strong{font-size:28px}.activity-stat-card>span{font-size:14px}
  .activity-event{grid-template-columns:49px minmax(0,1fr) 55px 48px;gap:15px}.activity-event-thumbnail{width:49px;height:57px}.activity-event-heading h3{font-size:17px}
 }
 @media(max-width:600px){
- .activity-page .activity-summary{gap:9px;margin-bottom:28px}.activity-stat-card{padding:14px 13px;min-height:90px;align-items:flex-start;flex-direction:column;justify-content:center;gap:8px;border-radius:11px}.activity-stat-card>span{font-size:13px}.activity-stat-card>strong{font-size:27px}
  .activity-day-label{font-size:13px}.activity-event{grid-template-columns:44px minmax(0,1fr) auto;gap:8px 13px;padding:20px 0}.activity-event-thumbnail{width:44px;height:53px;grid-row:1/3}.activity-event-copy{grid-column:2;grid-row:1/3;gap:5px}.activity-event-heading h3{font-size:16px}.activity-event-file{font-size:13px}.activity-event-time{grid-column:3;grid-row:1;font-size:12px}.activity-event-tools{grid-column:3;grid-row:2;margin-top:-3px;align-self:start}.activity-undo{font-size:12px;min-height:34px;padding:7px 0}.activity-event-copy>.ai-badge{font-size:11px;padding:5px 7px}.activity-undone-label{font-size:11px}.activity-event-heading{gap:7px}
 }
-@media(prefers-reduced-motion:reduce){.activity-stat-card{transition:none}.activity-stat-card:hover{transform:none}}
+@media(prefers-reduced-motion:reduce){.history-drawer .activity-stat-card{transition:none}}

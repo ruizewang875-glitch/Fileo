@@ -17,14 +17,14 @@ export function recommendationDetails(file,{showBadge=true}={}){
 }
 // Delegate once: lists are rerendered for filtering, decisions and project changes.
 export function installSuggestionPopovers({getFile}){
- let anchor=null,pop=null,observer=null,frame=0,keyboard=false,restoring=false;
+ let anchor=null,pop=null,observer=null,frame=0;
  function close({restore=false}={}){
   const old=anchor;
   if(frame)cancelAnimationFrame(frame);frame=0;observer?.disconnect();observer=null;
   anchor=null;
   if(pop){pop.remove();pop=null;}
-  if(old){old.setAttribute('aria-expanded','false');old.removeAttribute('aria-controls');old.removeAttribute('aria-describedby');}
-  if(restore&&old?.isConnected){restoring=true;old.focus({preventScroll:true});restoring=false;}
+  if(old){old.setAttribute('aria-expanded','false');old.removeAttribute('aria-controls');}
+  if(restore&&old?.isConnected)old.focus({preventScroll:true});
  }
  function place(){
   frame=0;if(!anchor||!pop)return;
@@ -38,37 +38,42 @@ export function installSuggestionPopovers({getFile}){
   pop.dataset.above=String(above);
  }
  function onMove(){if(anchor&&!frame)frame=requestAnimationFrame(place);}
- function open(button){
+ function open(button,focusDisclosure){
   const f=getFile?.(button.dataset.recFile);if(!f)return;
-  close();anchor=button;pop=document.createElement('aside');pop.className='rec-popover';pop.id='fileo-suggestion-bubble';pop.setAttribute('role','dialog');pop.setAttribute('aria-labelledby','fileo-suggestion-title');
-  pop.innerHTML='<div class="rec-pop-head"><strong id="fileo-suggestion-title">Why '+choices[key(f)]+'?</strong><button type="button" class="rec-pop-close" aria-label="Close explanation">×</button></div>'+tagsHTML(f)+'<p id="fileo-suggestion-reason">'+escape(reason(f))+'</p>';
+  close();anchor=button;pop=document.createElement('aside');pop.className='rec-popover';pop.id='fileo-suggestion-bubble';pop.setAttribute('role','dialog');pop.setAttribute('aria-label','Why AI suggests '+choices[key(f)]+' for '+f.file);
+  pop.innerHTML='<div class="rec-pop-summary">'+tagsHTML(f)+'<button type="button" class="rec-pop-toggle" aria-label="Detailed reasoning" aria-expanded="false" aria-controls="fileo-suggestion-reason">'+arrow+'</button></div><p hidden id="fileo-suggestion-reason">'+escape(reason(f))+'</p>';
+  const toggle=pop.querySelector('.rec-pop-toggle'),explanation=pop.querySelector('p');
+  toggle.addEventListener('click',()=>{
+   explanation.hidden=!explanation.hidden;
+   toggle.setAttribute('aria-expanded',String(!explanation.hidden));
+   pop.classList.toggle('is-expanded',!explanation.hidden);
+   onMove();
+  });
   const host=button.closest('dialog[open]')||document.body;
   if(typeof pop.showPopover==='function')pop.setAttribute('popover','manual');
   host.append(pop);
   if(pop.hasAttribute('popover')){try{pop.showPopover();}catch{pop.removeAttribute('popover');}}
-  button.setAttribute('aria-expanded','true');button.setAttribute('aria-controls',pop.id);button.setAttribute('aria-describedby','fileo-suggestion-reason');
+  button.setAttribute('aria-expanded','true');button.setAttribute('aria-controls',pop.id);
   place();if(!pop)return;
+  if(focusDisclosure)toggle.focus({preventScroll:true});
   observer=new MutationObserver(()=>{if(!anchor?.isConnected||anchor.closest('[hidden],[inert]')||!anchor.getClientRects().length)close();else onMove();});
   observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden','inert','open']});
  }
  function onClick(event){
   const target=event.target;if(!(target instanceof Element))return;
   const trigger=target.closest('button[data-rec-file]');
-  if(trigger){event.stopPropagation();if(trigger===anchor)close();else open(trigger);return;}
-  if(pop?.contains(target)){if(target.closest('.rec-pop-close')){event.stopPropagation();close({restore:true});}return;}
-  if(anchor)close();
+  if(trigger){event.stopPropagation();if(trigger===anchor)close();else open(trigger,event.detail===0);return;}
+  if(anchor&&!pop?.contains(target))close();
  }
  function onFocus(event){
-  const el=event.target;if(!(el instanceof Element)||restoring)return;
-  if(el===anchor||pop?.contains(el))return;
-  if(anchor)close();
-  if(keyboard&&el.matches('button[data-rec-file]:focus-visible'))open(el);
+  if(anchor&&event.target!==anchor&&!pop?.contains(event.target))close();
  }
  function onKey(event){
-  if(event.key==='Tab')keyboard=true;
-  if(event.key==='Escape'&&pop){event.preventDefault();event.stopPropagation();close({restore:true});}
+  if(!pop)return;
+  if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close({restore:true});}
+  else if(event.key==='Tab'&&pop.contains(event.target))close({restore:true});
+  else if(event.key==='Tab'&&!event.shiftKey&&event.target===anchor){event.preventDefault();pop.querySelector('.rec-pop-toggle').focus({preventScroll:true});}
  }
- function onPointer(){keyboard=false;}
- document.addEventListener('click',onClick,true);document.addEventListener('focusin',onFocus);document.addEventListener('keydown',onKey,true);document.addEventListener('pointerdown',onPointer,true);document.addEventListener('scroll',onMove,true);window.addEventListener('resize',onMove);
- return {close,destroy(){close();document.removeEventListener('click',onClick,true);document.removeEventListener('focusin',onFocus);document.removeEventListener('keydown',onKey,true);document.removeEventListener('pointerdown',onPointer,true);document.removeEventListener('scroll',onMove,true);window.removeEventListener('resize',onMove);}};
+ document.addEventListener('click',onClick,true);document.addEventListener('focusin',onFocus);document.addEventListener('keydown',onKey,true);document.addEventListener('scroll',onMove,true);window.addEventListener('resize',onMove);
+ return {close,destroy(){close();document.removeEventListener('click',onClick,true);document.removeEventListener('focusin',onFocus);document.removeEventListener('keydown',onKey,true);document.removeEventListener('scroll',onMove,true);window.removeEventListener('resize',onMove);}};
 }

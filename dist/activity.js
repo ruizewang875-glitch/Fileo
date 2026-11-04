@@ -1,6 +1,12 @@
 const DECISION_LABELS = {pending:'To review',keep:'Keep',archive:'Archive',trash:'Trash'};
 const ACTION_LABELS = {keep:'Kept',archive:'Archived',trash:'Moved to Trash',pending:'Marked to review',import:'Imported'};
 
+const SUMMARY = [
+ ['keep', 'Kept', 'm4 10 4 4L16 6'],
+ ['archive', 'Archived', 'M3 4h14v3H3z M4.5 7v9h11V7 M8 10h4'],
+ ['trash', 'In Trash', 'M3 6h14 M7.5 6V3.5h5V6 M5.5 6l.8 10.5h7.4L14.5 6 M8.5 9v5m3-5v5']
+];
+
 function recordedOutcome(event) {
  const decisions = [...new Set((Array.isArray(event.after) ? event.after : []).map(file => file.decision).filter(value => Object.hasOwn(DECISION_LABELS,value)))];
  return decisions.length === 1 ? DECISION_LABELS[decisions[0]] : '';
@@ -29,11 +35,13 @@ export function createActivity({getState,canUndo,onPreview,onUndo,thumb,badge,es
  const esc = escapeHtml;
  function render() {
   const state = getState(), summary = document.querySelector('#activity-summary'), list = document.querySelector('#activity-list');
-  const labels = {keep:'Kept',archive:'Archived',trash:'In Trash'};
-  summary.setAttribute('aria-label','Current file decisions');
-  summary.innerHTML = ['keep','archive','trash'].map(decision => {
+  summary.setAttribute('role','navigation');
+  summary.setAttribute('aria-label','Browse files by decision');
+  summary.innerHTML = SUMMARY.map(([decision,label,path]) => {
    const count = state.files.filter(file => file.decision === decision).length;
-   return `<a class="activity-stat-card" data-decision="${decision}" href="#browse?view=${decision}" aria-label="${labels[decision]}: ${count} ${count === 1 ? 'file' : 'files'}"><span>${labels[decision]}</span><strong>${count}</strong></a>`;
+   return `<a class="activity-stat-card" data-decision="${decision}" href="#browse?view=${decision}" aria-label="${label}: ${count} ${count === 1 ? 'file' : 'files'}">
+    <span class="history-status-mark" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg></span>
+    <span class="history-status-label">${label}</span><strong>${count}</strong></a>`;
   }).join('');
   if (!state.history.length) {
    list.innerHTML = '<div class="activity-empty"><h2>Your decisions will appear here</h2></div>';

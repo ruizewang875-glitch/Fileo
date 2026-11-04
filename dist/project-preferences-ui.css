@@ -43,3 +43,13 @@
 .prefs-account-copy>span{font-size:12px;color:#796b82}
 .prefs-account-edit>svg{flex:none}
 @media(max-width:600px){.welcome-intro{max-width:39ch;margin-bottom:15px;padding:0 8px}.prefs-dialog{padding:22px}.prefs-dialog h2{margin-top:20px}.prefs-actions{margin-top:20px}.prefs-preset{padding:7px 9px}.prefs-presets{gap:7px}}
+
+/* Native select, navigation row and save action share one trailing icon rail. */
+#account-panel{--account-icon-size:16px;--account-icon-inset:16px}
+.account-select-wrap{display:grid;align-items:center;position:relative;min-width:0}
+#account-sort{appearance:none;-webkit-appearance:none;padding-inline-end:calc(var(--account-icon-inset) + var(--account-icon-size) + 8px)}
+#account-panel .account-control-icon{display:block;width:var(--account-icon-size);height:var(--account-icon-size);flex:none;pointer-events:none}
+.account-select-wrap .account-control-icon{position:absolute;inset-inline-end:var(--account-icon-inset);top:50%;transform:translateY(-50%);color:#776182}
+#prefs-account-edit{padding-inline-end:calc(var(--account-icon-inset) - 1px)}
+#account-panel .account-save{padding-inline-end:var(--account-icon-inset)}
+@media(forced-colors:active){.account-select-wrap .account-control-icon{color:ButtonText}}

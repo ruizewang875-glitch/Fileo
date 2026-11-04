@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createWorkspace} from '../dist/workspace.js';
+import {createWorkspace,normalizePreferenceTags} from '../dist/workspace.js';
+import {FILES,typeForExtension} from '../dist/data.js';
 const NOW=Date.parse('2026-10-21T12:00:00Z');
 const memory=()=>{const m=new Map();return {getItem:k=>m.get(k)||null,setItem:(k,v)=>m.set(k,v),map:m};};
 const make=(storage=memory())=>createWorkspace({storage,now:()=>NOW});
@@ -11,9 +12,9 @@ test('fresh workspace starts signed out with no fabricated files',()=>{
  assert.equal(ws.login('  '),false);assert.equal(ws.login('  Taylor  '),true);assert.equal(ws.getState().session.name,'Taylor');
 });
 test('sample import is resumable, deterministic and idempotent',()=>{
- const ws=make(),first=ws.loadDemo();assert.equal(first.added,21);assert.equal(ws.getState().analysis.status,'pending');
+ const ws=make(),first=ws.loadDemo();assert.equal(first.added,FILES.length);assert.equal(ws.getState().analysis.status,'pending');
  ws.setAnalysisStep(2);assert.equal(ws.getState().analysis.step,2);ws.finishAnalysis();assert.equal(ws.getState().analysis.status,'done');
- assert.deepEqual(ws.loadDemo(),{added:0,skipped:21,ids:[]});assert.equal(ws.getState().files.length,21);
+ assert.deepEqual(ws.loadDemo(),{added:0,skipped:FILES.length,ids:[]});assert.equal(ws.getState().files.length,FILES.length);
  assert.deepEqual(new Set(ws.getState().files.map(f=>f.bucket)),new Set(['keep','archive','trash','undecided']));
 });
 test('metadata import handles native files without unrelated sample images',()=>{
@@ -54,7 +55,7 @@ test('sign out, reload and sign in preserve file progress and resume target',()=
  const resumed=make(storage);assert.equal(resumed.getState().session.signedIn,false);resumed.login('Alex');assert.equal(resumed.getState().resumeId,'file-5');assert.equal(resumed.getState().files[0].decision,'keep');assert.deepEqual(resumed.getState().saved,['file-4']);assert.deepEqual(resumed.getState().recent,['file-5']);
 });
 test('storage denial is reported while the current session remains usable',()=>{
- const ws=make({getItem:()=>null,setItem:()=>{throw Error('Quota exceeded');}});ws.login('Alex');ws.loadDemo();assert.equal(ws.getState().storageError,true);assert.equal(ws.getState().files.length,21);
+ const ws=make({getItem:()=>null,setItem:()=>{throw Error('Quota exceeded');}});ws.login('Alex');ws.loadDemo();assert.equal(ws.getState().storageError,true);assert.equal(ws.getState().files.length,FILES.length);
 });
 test('malformed persisted data does not crash or revive missing IDs',()=>{
  const storage=memory();storage.setItem('fileo-workspace-v2','{broken');assert.deepEqual(make(storage).getState().files,[]);
@@ -142,7 +143,7 @@ test('duplicate re-import repairs thumbnails without resetting decisions, analys
  const first=ws.importFiles([original]);ws.finishAnalysis();const id=first.ids[0],event=ws.decide(id,'archive',{use:'later'});
  const thumbnail='data:image/webp;base64,YWJj',repair=ws.importFiles([{...original,previewData:thumbnail,previewKey:'preview-key',previewStatus:'ready',width:4000,height:3000,previewVolatile:false}]);
  assert.deepEqual(repair,{added:0,skipped:1,ids:[],repaired:1,repairedIds:[id]});
- const current=ws.getState();assert.equal(current.analysis.status,'done');assert.equal(current.history.length,1);assert.equal(current.files[0].decision,'archive');assert.equal(current.files[0].bucket,'keep');assert.equal(current.files[0].app,'Image');assert.equal(current.files[0].previewData,thumbnail);assert.equal(ws.canUndo(event.id),true);
+ const current=ws.getState();assert.equal(current.analysis.status,'done');assert.equal(current.history.length,1);assert.equal(current.files[0].decision,'archive');assert.equal(current.files[0].bucket,'keep');assert.equal(current.files[0].type,typeForExtension('.jpg').id);assert.equal(current.files[0].previewData,thumbnail);assert.equal(ws.canUndo(event.id),true);
  const persisted=make(storage).getState().files[0];assert.equal(persisted.previewKey,'preview-key');assert.equal(persisted.width,4000);assert.equal(persisted.height,3000);assert.equal(persisted.previewStatus,'ready');
  assert.equal(ws.importFiles([{...original,previewData:thumbnail,previewKey:'preview-key',previewStatus:'ready',width:4000,height:3000,previewVolatile:false}]).repaired,0);
 });
@@ -163,7 +164,56 @@ test('older demo image assets migrate to WebP without changing local previews or
  storage.setItem('fileo-workspace-v2',JSON.stringify(raw));
  const restored=make(storage),state=restored.getState(),lookup=id=>state.files.find(f=>f.id===id);
  assert.equal(lookup('file-1').image,'landscape.webp');assert.equal(lookup('file-4').image,'chair.webp');assert.equal(lookup('file-10').image,'sculpture.webp');
- assert.equal(lookup('file-7').image,'custom.png');
+ assert.equal(lookup('file-7').image,FILES.find(f=>f.id==='file-7').image);assert.equal(lookup('file-7').previewKey,FILES.find(f=>f.id==='file-7').previewKey);
  assert.equal(lookup(imported.ids[0]).image,undefined);assert.equal(lookup(imported.ids[0]).previewData,'data:image/png;base64,YWJj');
  assert.equal(lookup('file-4').decision,'archive');assert.deepEqual(state.saved,['file-1']);assert.equal(restored.canUndo(decision.id),true);
+});
+
+
+test('project goals can be chosen before import; matched custom goals persist and do not alter decisions or other projects',()=>{
+ const storage=memory(),ws=make(storage),source=input('aurora_study.psd',{lastModified:NOW-220*86400000});
+ assert.deepEqual(ws.setProjectPreferences('A',['  Aurora  ','AURORA','',null]),['Aurora']);
+ assert.deepEqual(ws.getProjectPreferences('A'),['Aurora']);assert.equal(ws.getState().session.project,'');
+ const first=ws.importFiles([source],{project:'A'}).ids[0],other=ws.importFiles([source],{project:'B'}).ids[0];
+ const file=(w,id)=>w.getState().files.find(f=>f.id===id);
+ assert.equal(file(ws,first).baseBucket,'undecided');assert.equal(file(ws,first).bucket,'keep');
+ assert.match(file(ws,first).reason,/aurora/i);assert.ok(file(ws,first).reasonTags.length);
+ assert.equal(file(ws,other).bucket,'undecided');const otherBefore=file(ws,other);
+ const decision=ws.decide(first,'archive');ws.setProjectPreferences('A',[]);
+ assert.equal(file(ws,first).bucket,'undecided');assert.equal(file(ws,first).decision,'archive');
+ assert.deepEqual(file(ws,other),otherBefore);assert.equal(ws.canUndo(decision.id),true);
+ ws.setProjectPreferences('A',['Aurora']);const again=make(storage);
+ assert.deepEqual(again.getProjectPreferences('A'),['Aurora']);assert.deepEqual(again.getProjectPreferences('B'),[]);
+ assert.equal(file(again,first).bucket,'keep');assert.equal(file(again,first).decision,'archive');assert.equal(again.canUndo(decision.id),true);
+});
+
+test('preference labels are finite, Unicode-safe and independent of special project names',()=>{
+ const ws=make(),labels=['   Keep   final work  ','KEEP final work','Ａｕｒｏｒａ','Aurora','x'.repeat(100),...Array.from({length:20},(_,i)=>`Tag ${i}`)];
+ const normalized=normalizePreferenceTags(labels);assert.equal(normalized.length,12);
+ assert.deepEqual(normalized.slice(0,3),['Keep final work','Aurora','x'.repeat(48)]);
+ assert.deepEqual(ws.getProjectPreferences('__proto__'),[]);const result=ws.setProjectPreferences('__proto__',labels);
+ result.push('mutated');assert.deepEqual(ws.getProjectPreferences('__proto__'),normalized);assert.deepEqual(ws.getProjectPreferences('constructor'),[]);
+});
+
+test('existing demo catalogs gain new examples in place without restarting their scan, review or history',()=>{
+ const storage=memory(),ws=make(storage);ws.loadDemo();ws.finishAnalysis();const event=ws.decide('file-4','archive');
+ ws.toggleSaved('file-4');ws.startReview(['file-1','file-5'],{focusId:'file-5',returnTo:'#explore'});
+ const raw=ws.getState();raw.files=raw.files.filter(f=>Number(f.id.slice(5))<=21);
+ raw.analysis={status:'pending',step:2,ids:['file-1','file-5']};delete raw.projectPreferences;
+ for(const file of raw.files){delete file.baseBucket;delete file.baseReason;delete file.reasonTags;}
+ storage.setItem('fileo-workspace-v2',JSON.stringify(raw));const upgraded=make(storage),s=upgraded.getState();
+ assert.equal(s.files.length,FILES.length);assert.equal(new Set(s.files.map(f=>f.id)).size,FILES.length);assert.deepEqual(s.analysis,raw.analysis);
+ assert.deepEqual(s.review,raw.review);assert.deepEqual(s.saved,raw.saved);assert.deepEqual(s.history,raw.history);
+ assert.equal(s.files.find(f=>f.id==='file-4').decision,'archive');assert.ok(upgraded.canUndo(event.id));
+ assert.ok(s.files.every(f=>f.source==='demo'&&f.project==='Studio semester'&&f.reasonTags.length));
+ const personal=make(),localId=personal.importFiles([input('studio.txt')],{project:'Studio semester'}).ids[0];
+ storage.setItem('fileo-workspace-v2',JSON.stringify(personal.getState()));assert.deepEqual(make(storage).getState().files.map(f=>f.id),[localId]);
+});
+
+
+test('trashing a matching demo original suspends its copy suggestion; restoring it immediately restores the original evidence',()=>{
+ const ws=make();ws.loadDemo();const lookup=id=>ws.getState().files.find(f=>f.id===id);
+ assert.equal(lookup('file-2').bucket,'trash');const action=ws.decide('file-1','trash');
+ assert.equal(lookup('file-2').bucket,'undecided');assert.ok(lookup('file-2').reasonTags.includes('Peer in Trash')||lookup('file-2').reason.includes('already in Trash'));
+ ws.undo(action.id);assert.equal(lookup('file-2').bucket,'trash');assert.equal(lookup('file-2').decision,'pending');
 });

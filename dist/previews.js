@@ -1,3 +1,4 @@
+import {readDocumentPreview} from './document-previews.js';
 // Local raster previews: a small catalog thumbnail plus a larger IndexedDB image.
 // Original files are neither uploaded nor retained. Source files above 100 MiB or
 // decoded images above 60 MP receive an explicit fallback instead of exhausting memory.
@@ -109,14 +110,16 @@ function encodeBlob(canvas){
  });
 }
 export async function preparePreview(file){
- const kind=imageKind(file);if(!kind.isImage)return {previewStatus:'not-image'};
+ const kind=imageKind(file);
+ let documentArt=null;
+ if(!kind.isImage){documentArt=await readDocumentPreview(file);if(!documentArt)return {previewStatus:'not-image'};}
  const previewKey=await previewKeyFor(file);
  const failure=(previewStatus,previewError)=>({previewKey,previewStatus,previewError});
- if(!kind.supported)return failure('unsupported',`${kind.extension.toUpperCase()||'This image format'} needs a JPEG or PNG export for preview.`);
- if(Number(file.size)>PREVIEW_LIMITS.sourceBytes)return failure('unsupported','Image exceeds 100 MB. Choose a smaller export for preview.');
+ if(!documentArt&&!kind.supported)return failure('unsupported',`${kind.extension.toUpperCase()||'This image format'} needs a JPEG or PNG export for preview.`);
+ if(!documentArt&&Number(file.size)>PREVIEW_LIMITS.sourceBytes)return failure('unsupported','Image exceeds 100 MB. Choose a smaller export for preview.');
  let decoded,canvas;
  try{
-  decoded=await decode(file,kind.mime);
+  decoded=await decode(documentArt?.blob||file,documentArt?.mime||kind.mime);
   if(decoded.width*decoded.height>PREVIEW_LIMITS.pixels)return failure('unsupported','Image exceeds 60 megapixels. Choose a smaller export for preview.');
   const previewData=thumbnail(decoded),result={previewData,previewKey,previewStatus:'ready',width:decoded.width,height:decoded.height};
   try{
@@ -125,7 +128,7 @@ export async function preparePreview(file){
    if(urls.has(previewKey)){URL.revokeObjectURL(urls.get(previewKey));urls.delete(previewKey);}
   }catch{result.previewVolatile=true;}
   return result;
- }catch{return failure('unreadable','Could not decode this image. Try selecting it again or export a JPEG / PNG.');}
+ }catch{return documentArt?{previewStatus:'not-image'}:failure('unreadable','Could not decode this image. Try selecting it again or export a JPEG / PNG.');}
  finally{decoded?.dispose();if(canvas)canvas.width=canvas.height=1;}
 }
 export async function getPreviewUrl(record={}){

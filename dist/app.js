@@ -1,5 +1,9 @@
 import {TYPES,BUCKETS,FILES,searchFiles,formatStorage} from './data.js';
 import {art} from './art.js';
+import {demoPreview} from './demo-preview.js';
+import {fileCover} from './document-previews.js';
+import {installSuggestionPopovers,recommendationDetails,suggestionBadge} from './recommendation-ui.js';
+import {createProjectPreferencesUI} from './project-preferences-ui.js';
 import {createCarousel} from './carousel.js';
 import {createQuickMode} from './quick-mode.js';
 import {createExploreMode} from './explore-mode.js';
@@ -14,7 +18,7 @@ const state=()=>ws.getState(),records=()=>state().files,esc=s=>String(s??'').rep
 const paths={files:'M8 3h9l4 4v13H8z M17 3v5h4 M4 7H3v15h13',folder:'M3 6h7l2 3h9v11H3z M3 6V4h7l2 2h8v3',upload:'M12 16V3m-5 5 5-5 5 5 M4 15v6h16v-6',keep:'m5 12 4 4L19 6',archive:'M4 7h16v14H4z M3 3h18v4H3z M9 11h6',trash:'M4 6h16 M9 6V3h6v3 M6 6l1 15h10l1-15 M10 10v7m4-7v7',undecided:'M9 8a3 3 0 1 1 5 2c-2 1-2 2-2 4 M12 18h.01',restore:'M4 9h10a6 6 0 0 1 0 12 M8 5 4 9l4 4',check:'m5 12 4 4L19 6'};
 const icon=(name)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name]||paths.files}"/></svg>`;
 $$('[data-icon]').forEach(n=>n.innerHTML=icon(n.dataset.icon));
-const badge=f=>`<span class="ai-badge" data-bucket="${f.bucket}" aria-label="AI suggestion: ${f.bucket}">✦ AI · ${BUCKETS.find(b=>b.id===f.bucket)?.label||'Undecided'}</span>`;
+const badge=f=>suggestionBadge(f);
 const decisionLabels={pending:'To review',keep:'Kept',archive:'Archived',trash:'In Trash'};
 const pill=f=>`<span class="decision-pill" data-decision="${f.decision}">${decisionLabels[f.decision]}</span>`;
 const prettySize=f=>f.size<0.001?`${Math.round(f.size*1e6)} B`:f.size<1?`${Math.round(f.size*1000)} KB`:formatStorage(Math.round(f.size*100)/100);
@@ -22,6 +26,9 @@ const currentFiles=()=>projectFiles(records(),state().session.project);
 const modeHome=()=>({page:state().session.mode==='explore'?'explore':'quick'});
 const pending=()=>currentFiles().filter(f=>f.decision==='pending');
 const previewUrls=new Map();
+const prefUI=createProjectPreferencesUI({getTags:p=>ws.getProjectPreferences(p),setTags:(p,tags)=>ws.setProjectPreferences(p,tags),onSaved:()=>refreshCurrent()});
+installSuggestionPopovers({getFile:id=>currentFiles().find(f=>f.id===id)});
+$('#import-demo').textContent=`Use ${FILES.length} demo files →`;
 let importBusy=false,originalRepairId=null,repairId=null,authEmail='',authIntent={page:'import'},lastPage='',routeGeneration=0,renderedHash=null;
 let route={},sort=state().session.sort,previewId=null,reviewId=state().resumeId,queue=[],loginNext='import',analysisTimer=null,analysisPaused=false,toastEvent=null,toastTimer=null,confirmFn=null,clarifyId=null,clarifyChoice=null;
 function hash(params={}){let {page='browse',...rest}=params;const p=new URLSearchParams();for(const[k,v]of Object.entries(rest))if(v)p.set(k,v);return '#'+(page==='home'?'':page)+(p.size?'?'+p:'');}
@@ -68,7 +75,7 @@ $('#google-demo-account').onclick=()=>completeLogin({name:'Demo Designer',email:
 $('#email-back').onclick=$('#google-back').onclick=()=>showAuthStep('auth-options');
 function renderHome(){
  const s=state(),files=currentFiles(),has=s.session.signedIn&&files.length;
- $('#home-dock').hidden=!has;$('#welcome-actions').hidden=!!has;$('#resume-card').hidden=!has;$('#home-view').classList.toggle('has-workspace',!!has);$('#home-workspace-actions').hidden=!has;
+ $('#welcome-intro').hidden=s.session.signedIn;$('#home-dock').hidden=!has;$('#welcome-actions').hidden=!!has;$('#resume-card').hidden=!has;$('#home-view').classList.toggle('has-workspace',!!has);$('#home-workspace-actions').hidden=!has;
  $('#welcome-primary').innerHTML=s.session.signedIn?'Choose files <span>↗</span>':'Log in & add files <span>↗</span>';$('#welcome-secondary').textContent=s.session.signedIn?'Read a local folder →':'Explore a demo →';
  carousel.refresh?.();if(!has)return;
  const left=pending().length,done=files.length-left,pct=Math.round(done/files.length*100);
@@ -93,13 +100,16 @@ function continueReview(){
 $('#resume-button').onclick=()=>continueReview();
 $('#header-import').onclick=()=>{if(state().session.signedIn)navigate({page:'import'});else openLogin('import');};
 
-function thumb(f){if(f.source==='local')return f.previewData?`<img src="${esc(f.previewData)}" alt="" loading="lazy">`:`<span class="file-format">${esc(f.ext||'FILE')}</span>`;return f.image?`<img src="assets/${esc(f.image)}" alt="" loading="lazy">`:`<span class="file-format">${esc(f.ext)}</span>`;}
+function thumb(f){
+ const preview=f.source==='local'?(f.previewData?{src:f.previewData,alt:'Preview of '+f.file}:fileCover(f)):demoPreview(f)||fileCover(f);
+ return `<img src="${esc(preview.src)}" alt="${esc(preview.alt)}" loading="lazy">`;
+}
 function fileArt(f){
- if(f.source==='demo')return art(f);
+ if(f.source==='demo'&&demoPreview(f))return art(f);
  const src=previewUrls.get(f.id)||f.previewData;
  if(src)return `<img class="local-preview" data-preview-id="${esc(f.id)}" src="${esc(src)}" alt="Preview of ${esc(f.file)}">`;
- const isImage=imageKind({name:f.file,type:f.type}).isImage;
- return `<div class="native-preview"><span class="native-file-icon">${esc(f.ext||'FILE')}</span><strong>${isImage?'Image preview unavailable':'Native file'}</strong><span>${esc(f.previewError||(isImage?'Select this image again to create its preview.':'Open in '+f.app+' to view its contents.'))}</span>${isImage?`<button class="secondary-button" data-repair="${esc(f.id)}">Select image again ↗</button>`:''}</div>`;
+ const cover=fileCover(f),repair=f.source==='local'&&imageKind({name:f.file}).isImage;
+ return `<div class="file-cover-art"><img data-preview-id="${esc(f.id)}" src="${esc(cover.src)}" alt="${esc(cover.alt)}">${repair?`<button class="secondary-button" data-repair="${esc(f.id)}">Select image again ↗</button>`:''}</div>`;
 }
 function hydrateArt(container,f){
  container.querySelectorAll('[data-repair]').forEach(b=>b.onclick=()=>{repairId=f.id;$('#file-input').click();});
@@ -110,7 +120,7 @@ function syncContext(){
  const s=state(),projects=[...new Set(records().map(f=>f.project))],has=s.session.signedIn&&records().length;
  $('.mode-switch').hidden=!has;$('#history-toggle').hidden=!has;
  $('#workspace-context').hidden=!has||!['quick','explore','browse'].includes(route.page);
- $('#project-select').innerHTML=projects.map(name=>`<option value="${esc(name)}" ${name===s.session.project?'selected':''}>${esc(name)}</option>`).join('');
+ $('#project-select').innerHTML=projects.map(name=>`<option value="${esc(name)}" ${name===s.session.project?'selected':''}>${esc(name)}</option>`).join('')+'<option data-create-project>＋ New project…</option>';
  $('#project-total').textContent=`${currentFiles().length} files`;
  $$('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===s.session.mode)));
 }
@@ -135,7 +145,7 @@ function renderRoute(){
  for(const id of ['home','quick','browse','import','analysis','review'])$('#'+id+'-view').hidden=id==='home'?!['home','explore'].includes(route.page):id!==route.page;
  if(route.page!=='quick')quickUI.deactivate();
  if(['home','explore'].includes(route.page))renderHome();if(route.page==='quick')quickUI.render({enter:lastPage!=='quick'});if(route.page==='browse')exploreUI.render(route);
- if(route.page==='import'){$('#import-project-name').value=state().session.project||'My project';renderQueue();}
+ if(route.page==='import'){$('#import-project-name').value=route.new==='1'?'':(state().session.project||'My project');$('#import-project-name').placeholder='Project name';renderQueue();}
  if(route.page==='analysis'){analysisPaused=false;startAnalysis();}if(route.page==='review')renderReview();
  syncHeader();syncContext();carousel.resetClock();document.title=({home:'Files in order. Ideas in motion.',quick:'Quick Clear',explore:'Explore & Decide',browse:'Explore files',import:'Add files',analysis:'Preparing suggestions',review:'Explore & Decide'}[route.page])+' — FILEO';
  if(lastPage!==route.page){window.scrollTo({top:0,behavior:'instant'});$('#main').focus({preventScroll:true});}lastPage=route.page;
@@ -145,7 +155,7 @@ function onHistoryRoute(){if(renderedHash!==location.hash)renderRoute();}
 window.addEventListener('hashchange',onHistoryRoute);window.addEventListener('popstate',onHistoryRoute);
 $('#flow-exit').onclick=()=>{analysisPaused=true;clearTimeout(analysisTimer);if(state().analysis.status==='pending'){navigate({page:'import'});}else navigate(modeHome());};
 $$('[data-mode]').forEach(b=>b.onclick=()=>{ws.updateProfile({mode:b.dataset.mode});quickUI.clearSelection();exploreUI.clearSelection();navigate({page:b.dataset.mode});});
-$('#project-select').onchange=e=>{ws.setProject(e.target.value);quickUI.clearSelection();exploreUI.clearSelection();navigate(modeHome());};
+$('#project-select').onchange=e=>{if(e.target.selectedOptions[0]?.hasAttribute('data-create-project')){navigate({page:'import',new:'1'});$('#import-project-name').focus();return;}ws.setProject(e.target.value);quickUI.clearSelection();exploreUI.clearSelection();navigate(modeHome());};
 $('#home-search').onsubmit=e=>{e.preventDefault();navigate({page:'browse',q:$('#search').value});};
 $('#suggestions-toggle').onclick=()=>{const closed=!$('#suggestion-chips').hidden;$('#suggestion-chips').hidden=closed;$('#suggestions-toggle').setAttribute('aria-expanded',!closed);};
 $('#resume-analysis').onclick=()=>navigate({page:'analysis'});$('#import-consent').onchange=renderQueue;$('#import-project-name').oninput=renderQueue;
@@ -180,10 +190,10 @@ const drop=$('#drop-zone');for(const type of ['dragover','dragenter'])drop.addEv
 function renderQueue(){
  $('#resume-analysis').hidden=state().analysis.status!=='pending';
  const preparing=queue.some(i=>i.preparing);$('#import-queue').hidden=!queue.length;$('#begin-analysis').disabled=!queue.length||preparing||importBusy||!$('#import-consent').checked||!$('#import-project-name').value.trim();
- $('#begin-analysis').innerHTML=(importBusy?'Adding…':preparing?'Preparing previews…':'Analyze files')+' <span>→</span>';
+ $('#begin-analysis').innerHTML=(importBusy?'Adding…':preparing?'Preparing previews…':records().some(f=>f.project===$('#import-project-name').value.trim())?'Analyze files':'Continue')+' <span>→</span>';
  for(const id of ['choose-files','choose-folder','clear-queue','import-demo'])$('#'+id).disabled=importBusy;
  $('#queue-title').textContent=`${queue.length} ${queue.length===1?'file':'files'}`;
- $('#queue-list').innerHTML=queue.map((item,i)=>`<div class="queue-row"><span class="queue-thumbnail">${item.preview?.previewData?`<img src="${esc(item.preview.previewData)}" alt="">`:icon(item.preparing?'undecided':'files')}</span><span class="queue-file"><strong>${esc(item.file.webkitRelativePath||item.file.name)}</strong>${item.preparing?'<small>Preparing preview…</small>':item.preview?.previewError?`<small>${esc(item.preview.previewError)}</small>`:''}</span><small>${prettySize({size:item.file.size/1e6})}</small><button class="icon-button" data-index="${i}" aria-label="Remove ${esc(item.file.name)}" ${importBusy?'disabled':''}>×</button></div>`).join('');
+ $('#queue-list').innerHTML=queue.map((item,i)=>`<div class="queue-row"><span class="queue-thumbnail">${item.preparing?icon('undecided'):`<img src="${esc(item.preview?.previewData||fileCover({file:item.file.name,bytes:item.file.size,size:item.file.size/1e6}).src)}" alt="">`}</span><span class="queue-file"><strong>${esc(item.file.webkitRelativePath||item.file.name)}</strong>${item.preparing?'<small>Preparing preview…</small>':item.preview?.previewError?`<small>${esc(item.preview.previewError)}</small>`:''}</span><small>${prettySize({size:item.file.size/1e6})}</small><button class="icon-button" data-index="${i}" aria-label="Remove ${esc(item.file.name)}" ${importBusy?'disabled':''}>×</button></div>`).join('');
  $$('#queue-list button').forEach(b=>b.onclick=()=>{if(importBusy)return;queue.splice(Number(b.dataset.index),1);renderQueue();});
 }
 $('#clear-queue').onclick=()=>{if(importBusy)return;queue=[];renderQueue();};
@@ -191,7 +201,12 @@ $('#begin-analysis').onclick=async()=>{
  if(importBusy||!queue.length||queue.some(i=>i.preparing)||!state().session.signedIn||!$('#import-consent').checked||!$('#import-project-name').value.trim())return;
  importBusy=true;renderQueue();const selected=[...queue];
  try{
-  const project=$('#import-project-name').value.trim(),result=ws.importFiles(selected.map(descriptor),{project});ws.setProject(project);await Promise.all(selected.map(async item=>{const record=records().find(f=>f.project===project&&f.path===(item.file.webkitRelativePath||item.file.name)&&f.file===item.file.name&&f.bytes===item.file.size&&f.lastModified===item.file.lastModified);if(record)await registerOriginal(record.id,item.file);}));queue=queue.filter(i=>!selected.includes(i));
+  const project=$('#import-project-name').value.trim();
+  if(!records().some(f=>f.project===project)){
+   const outcome=await prefUI.setup(project);
+   if(outcome==='back'||route.page!=='import'||!state().session.signedIn)return;
+  }
+  const result=ws.importFiles(selected.map(descriptor),{project});ws.setProject(project);await Promise.all(selected.map(async item=>{const record=records().find(f=>f.project===project&&f.path===(item.file.webkitRelativePath||item.file.name)&&f.file===item.file.name&&f.bytes===item.file.size&&f.lastModified===item.file.lastModified);if(record)await registerOriginal(record.id,item.file);}));queue=queue.filter(i=>!selected.includes(i));
   for(const id of result.repairedIds||[])previewUrls.delete(id);
   if(result.added){notify(`${result.added} added${result.repaired?` · ${result.repaired} previews repaired`:''}`);navigate({page:'analysis'});}
   else if(result.repaired){notify(`${result.repaired} previews repaired`);navigate(modeHome());}
@@ -199,7 +214,16 @@ $('#begin-analysis').onclick=async()=>{
  }catch{$('#import-error').textContent='Could not add these files. Please try again.';$('#import-error').hidden=false;}
  finally{importBusy=false;if(route.page==='import')renderQueue();}
 };
-function loadDemo(){if(!state().session.signedIn)return openLogin({page:'demo'});const result=ws.loadDemo();if(result.added)navigate({page:'analysis'});else navigate(modeHome());}
+async function loadDemo(){
+ if(!state().session.signedIn)return openLogin({page:'demo'});
+ const project='Studio semester';
+ if(!records().some(f=>f.project===project)){
+  const outcome=await prefUI.setup(project);
+  if(outcome==='back'){if(route.page==='home')renderHome();return;}
+ }
+ if(!state().session.signedIn)return;
+ const result=ws.loadDemo();if(result.added)navigate({page:'analysis'});else navigate(modeHome());
+}
 $('#import-demo').onclick=loadDemo;
 function startAnalysis(){
  const s=state(),generation=routeGeneration;if(s.analysis.status!=='pending')return;
@@ -211,7 +235,7 @@ function startAnalysis(){
  },600);
 }
 $('#pause-analysis').onclick=()=>{analysisPaused=true;clearTimeout(analysisTimer);navigate({page:'import'});};
-function recommendation(f){return `<div class="recommendation-card">${badge(f)}<p>${esc(f.reason)}</p></div>`;}
+function recommendation(f){return recommendationDetails(f,{showBadge:true});}
 function buttons(f){return ['keep','archive','trash','undecided'].map(d=>`<button class="decision-button ${f.decision===d?'is-selected':''}" data-decision="${d}" aria-label="${d==='undecided'?'Clarify':d[0].toUpperCase()+d.slice(1)} ${esc(f.file)}">${icon(d)}<span>${d==='undecided'?'Clarify':d[0].toUpperCase()+d.slice(1)}</span></button>`).join('');}
 function bindDecisions(container,id,advance){container.querySelectorAll('button.decision-button[data-decision]').forEach(b=>b.onclick=()=>chooseDecision(id,b.dataset.decision,advance));}
 function activeReviewFile(){const r=state().review;return records().find(f=>f.id===r.ids[r.cursor]);}
@@ -254,7 +278,7 @@ $('#clarify-apply').onclick=()=>{if(!clarifyChoice)return;const answers={keep:'S
 $('#clarify-later').onclick=()=>{$('#clarify-dialog').close();notify('Decision deferred. Your progress is saved.');if(clarifyAdvance)deferCurrent();};
 function openPreview(id){previewId=id;ws.touchRecent(id);updatePreview();$('#preview-dialog').showModal();}
 function updatePreview(){const f=records().find(f=>f.id===previewId);if(!f)return;$('#preview-art').innerHTML=fileArt(f);hydrateArt($('#preview-art'),f);$('#preview-title').textContent=f.file;$('#preview-app').textContent=f.app+(f.source==='demo'?' · Demo preview':'');$('#preview-meta').textContent=`${f.project} · ${prettySize(f)} · ${f.modified}`;$('#preview-recommendation').innerHTML=pill(f)+recommendation(f);$('#preview-decisions').innerHTML=buttons(f);bindDecisions($('#preview-decisions'),f.id,false);$('#preview-save').textContent=state().saved.includes(f.id)?'Saved ★':'Save ☆';$('#preview-save').setAttribute('aria-pressed',state().saved.includes(f.id));let undoButton=$('#preview-undo');if(!undoButton){undoButton=document.createElement('button');undoButton.id='preview-undo';undoButton.className='text-button';$('#preview-save').after(undoButton);}const event=state().history.find(e=>e.fileIds.includes(f.id)&&ws.canUndo(e.id));undoButton.hidden=!event;undoButton.textContent='↶ Undo';undoButton.onclick=()=>event&&undo(event.id);}
-$('#preview-close').onclick=()=>$('#preview-dialog').close();$('#preview-save').onclick=()=>{ws.toggleSaved(previewId);updatePreview();};$('#preview-similar').onclick=()=>{const f=records().find(f=>f.id===previewId);$('#preview-dialog').close();navigate({type:f.type});};
+$('#preview-close').onclick=()=>$('#preview-dialog').close();$('#preview-save').onclick=()=>{ws.toggleSaved(previewId);updatePreview();};$('#preview-similar').onclick=()=>{const f=records().find(f=>f.id===previewId);$('#preview-dialog').close();navigate({page:'browse',type:f.type});};
 const activityUI=createActivity({getState:()=>{const s=state(),files=currentFiles(),ids=new Set(files.map(f=>f.id));return {...s,files,history:s.history.filter(e=>e.fileIds.some(id=>ids.has(id)))};},canUndo:id=>ws.canUndo(id),onPreview:openPreview,onUndo:undo,thumb,badge,escapeHtml:esc});
 function renderActivity(){activityUI.render();$('#history-project').textContent=state().session.project;}
 function openHistory(){if(!state().session.signedIn)return;renderActivity();$('#history-drawer').showModal();}
@@ -275,7 +299,7 @@ async function openSourceFile(id){const f=records().find(f=>f.id===id);if(!f)ret
 const quickUI=createQuickMode({root:$('#quick-view'),getFiles:currentFiles,getState:state,thumb,badge,fileArt,hydrateArt,prettySize,escapeHtml:esc,onDecide:batchDecision});
 const exploreUI=createExploreMode({root:$('#browse-view'),getFiles:currentFiles,getState:state,thumb,badge,fileArt,hydrateArt,prettySize,escapeHtml:esc,onDecide:batchDecision,onReview:(ids,focus,filters)=>beginReview(ids,focus,hash({...route,...filters})),onOpenFile:openSourceFile,onBack:()=>navigate({page:'explore'}),onSave:id=>{ws.toggleSaved(id);refreshCurrent();}});
 $('#toast-undo').onclick=()=>undo(toastEvent);$('#toast-close').onclick=()=>$('#toast').hidden=true;
-$('#account-button').onclick=()=>{if(!state().session.signedIn)return openLogin({page:'home'});const p=state().session;$('#account-name').textContent=p.name;$('#account-email').textContent=p.email||'Prototype workspace';$('#account-avatar').textContent=$('#header-avatar').textContent;$('#display-name').value=p.name;$('#account-sort').value=p.sort;$('#account-autoplay').checked=p.autoplay;$('#account-save-status').textContent='';$('#account-panel').showModal();};$('#account-close').onclick=()=>$('#account-panel').close();$('#account-form').onsubmit=e=>{e.preventDefault();const name=$('#display-name').value.trim();if(!name)return;ws.updateProfile({name,sort:$('#account-sort').value,autoplay:$('#account-autoplay').checked});sort=state().session.sort;carousel.setAutoplay(state().session.autoplay);$('#account-name').textContent=name;$('#account-save-status').textContent='Saved';refreshCurrent();};$('#logout-button').onclick=()=>{closeDialogs();ws.logout();navigate({page:'home'});$('#toast').hidden=true;};
+$('#account-button').onclick=()=>{if(!state().session.signedIn)return openLogin({page:'home'});const p=state().session;$('#account-name').textContent=p.name;$('#account-email').textContent=p.email||'Prototype workspace';$('#account-avatar').textContent=$('#header-avatar').textContent;$('#display-name').value=p.name;$('#account-sort').value=p.sort;$('#account-autoplay').checked=p.autoplay;$('#account-save-status').textContent='';prefUI.syncAccount(p.project);$('#account-panel').showModal();};$('#account-close').onclick=()=>$('#account-panel').close();$('#account-form').onsubmit=e=>{e.preventDefault();const name=$('#display-name').value.trim();if(!name)return;ws.updateProfile({name,sort:$('#account-sort').value,autoplay:$('#account-autoplay').checked});sort=state().session.sort;carousel.setAutoplay(state().session.autoplay);$('#account-name').textContent=name;$('#account-save-status').textContent='Saved';refreshCurrent();};$('#logout-button').onclick=()=>{closeDialogs();ws.logout();navigate({page:'home'});$('#toast').hidden=true;};
 $('#assistant-button').onclick=()=>{if(!guard(modeHome()))return;$('#assistant-panel').showModal();};$('#assistant-close').onclick=()=>$('#assistant-panel').close();$('#assistant-form').onsubmit=e=>{e.preventDefault();navigate({page:'browse',q:$('#assistant-query').value.trim()});};$$('[data-assistant-query]').forEach(b=>b.onclick=()=>navigate({page:'browse',q:b.dataset.assistantQuery}));$$('[data-assistant-view]').forEach(b=>b.onclick=()=>navigate({page:'browse',view:b.dataset.assistantView}));
 $$('[data-close]').forEach(b=>b.onclick=()=>$('#'+b.dataset.close).close());for(const d of $$('dialog'))d.addEventListener('click',e=>{if(e.target!==d)return;const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();});document.addEventListener('keydown',e=>{if(!['import','analysis','review'].includes(route.page)&&(e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'&&state().session.signedIn&&records().length){e.preventDefault();closeDialogs();navigate({});setTimeout(()=>$('#browse-view input[type=search]')?.focus(),0);}});
 document.addEventListener('keydown',e=>{if(route.page!=='review'||$('dialog[open]')||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;if(e.key==='ArrowLeft'&&!$('#review-prev').disabled){e.preventDefault();nextReview(-1);}if(e.key==='ArrowRight'&&!$('#review-next').disabled){e.preventDefault();nextReview(1);}});

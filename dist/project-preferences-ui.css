@@ -1,0 +1,45 @@
+/* A single line of context on the signed-out landing page. */
+.home-view:has(#welcome-intro:not([hidden])) .slogan{margin-bottom:8px}
+.welcome-intro{margin:0 0 23px;max-width:640px;color:#706875;font-size:clamp(14px,1.12vw,16px);line-height:1.5;text-align:center;text-wrap:balance;flex-shrink:0}
+.prefs-dialog{width:min(496px,calc(100% - 36px));max-height:calc(100svh - 36px);padding:30px;border:1px solid #e4dce6;border-radius:20px;overflow:auto;color:#392e40;background:linear-gradient(135deg,#fff 0%,#faf8fb 70%,#f3eff5 100%);box-shadow:0 24px 80px #32223835}
+.prefs-dialog form{margin:0}
+.prefs-top,.prefs-actions,.prefs-custom-entry,.prefs-account-edit{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.prefs-project-pill{display:inline-flex;align-items:center;gap:7px;min-width:0;max-width:82%;border:1px solid #e5dce8;padding:6px 10px;border-radius:7px;font-size:13px;line-height:1.25;color:#786181;background:#f3eef5}
+.prefs-project-pill>span{white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.prefs-project-pill svg{width:17px;height:17px;flex:none}
+.prefs-close{flex:none;display:grid;place-items:center;width:32px;height:32px;background:transparent;border-radius:50%;color:#8b7992}
+.prefs-close:hover{background:#f0e8f1}
+.prefs-close svg,.prefs-custom-entry button svg,.prefs-account-edit>svg{width:16px;height:16px}
+.prefs-dialog h2{font-family:"FILEO Grotesk",sans-serif;font-size:clamp(24px,2.1vw,30px);letter-spacing:-.04em;font-weight:500;line-height:1.14;margin:25px 0 7px;outline:none}
+#prefs-description{margin:0 0 22px;color:#75687e;font-size:14px;line-height:1.45}
+.prefs-presets,.prefs-custom-list{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.prefs-preset,.prefs-custom-tag{position:relative;display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:7px 12px;border:1px solid #ddd3e1;border-radius:8px;background:#ffffffb8;color:#67576f;text-align:left;font-weight:450;font-size:13px;line-height:1.35;overflow-wrap:anywhere;transition:background .15s,border-color .15s}
+.prefs-preset:before{content:"+";font:400 16px/1 Arial,sans-serif;display:inline-grid;place-content:center;width:13px;color:#9e87a7}
+.prefs-preset[aria-pressed=true]{border-color:#b997bf;background:#eee2f1;color:#633b71}
+.prefs-preset[aria-pressed=true]:before{content:"";width:9px;height:5px;margin:0 2px;border-left:1.7px solid #84558f;border-bottom:1.7px solid #84558f;transform:translateY(-1px) rotate(-45deg)}
+.prefs-preset:hover,.prefs-custom-tag:hover{border-color:#b794c2}
+.prefs-custom-label{display:block;margin:22px 0 7px;color:#514457;font-weight:500;font-size:14px}
+.prefs-custom-entry{gap:4px;padding:3px 4px 3px 11px;border:1px solid #dcd3e0;border-radius:9px;background:#fff}
+.prefs-custom-entry:focus-within{border-color:#a887b4;box-shadow:0 0 0 2px #ac85b718}
+.prefs-custom-entry input{flex:1;min-width:0;min-height:35px;padding:5px 0;border:0;outline:0!important;background:transparent;color:#46354e;font:inherit;font-size:14px}
+.prefs-custom-entry input::placeholder{color:#978ba0}
+.prefs-custom-entry button{display:grid;place-items:center;flex:none;width:33px;height:33px;border-radius:6px;background:#ece1ef;color:#754784}
+.prefs-custom-entry button:disabled{color:#ab9eb1;background:#f5f1f5;cursor:default}
+.prefs-custom-list{margin-top:9px;gap:6px}
+.prefs-custom-tag{max-width:100%;min-height:31px;padding:5px 9px;background:#f1e8f2;border-color:#e7d9e9;color:#735780}
+.prefs-custom-tag:after{content:"×";font-size:15px;line-height:1;color:#94769c}
+.prefs-feedback{margin:8px 0 0;font-size:13px;color:#8c3d63}
+.prefs-actions{margin-top:26px;padding-top:17px;border-top:1px solid #e7dfe9}
+.prefs-actions .text-button{padding-left:0;color:#82688b}
+.prefs-actions .primary-button{gap:17px;min-height:42px;padding:11px 16px}
+#prefs-submit-label{font-size:14px;line-height:1.3}
+.prefs-account{padding:18px 0;margin:0;border-top:1px solid #e6dee9}
+.prefs-account h3{margin:0 0 10px;font-size:14px;font-weight:500}
+.prefs-account-edit{width:100%;padding:10px 12px;background:#faf7fb;border:1px solid #dfd5e4;border-radius:9px;text-align:left;color:#776182}
+.prefs-account-edit:hover{background:#f3ecf5;border-color:#c9b3d0}
+.prefs-account-copy{display:grid;min-width:0;gap:4px}
+.prefs-account-copy>*{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prefs-account-copy strong{font-weight:500;font-size:14px;color:#52405e}
+.prefs-account-copy>span{font-size:12px;color:#796b82}
+.prefs-account-edit>svg{flex:none}
+@media(max-width:600px){.welcome-intro{max-width:39ch;margin-bottom:15px;padding:0 8px}.prefs-dialog{padding:22px}.prefs-dialog h2{margin-top:20px}.prefs-actions{margin-top:20px}.prefs-preset{padding:7px 9px}.prefs-presets{gap:7px}}

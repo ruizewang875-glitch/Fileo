@@ -15,9 +15,9 @@ The project dropdown is shared by both modes. Mode and project choices persist o
 
 ## Import and originals
 
-After prototype sign-in, choose individual files, drag them in or select a local folder, name the project and authorize local processing. An optional 21-file sample project, **Studio semester**, demonstrates the full flow. Folder-relative paths distinguish same-named files; reselecting an imported image can repair its preview without resetting its decision.
+After prototype sign-in, choose individual files, drag them in or select a local folder, name the project and authorize local processing. An optional 37-file sample project, **Studio semester**, demonstrates the full flow. Folder-relative paths distinguish same-named files; reselecting an imported image can repair its preview without resetting its decision.
 
-Supported images receive real thumbnails and larger previews. Open original displays browser-supported images, PDF and text in a new tab; native design formats download for opening in their desktop application. Original file copies up to 50 MiB are retained in IndexedDB when storage permits. Larger files are available during the current session and may need to be selected again after reload. The browser cannot silently scan folders or launch arbitrary installed applications.
+All 37 demo records have authored previews across 15 carousel categories. Matching copies share artwork; Rhino, Illustrator, Figma, office and editorial studies show meaningful differences. Imported images are decoded locally. Text, supported Office documents and simple PDFs use embedded thumbnails or bounded content excerpts when available; remaining native files show a generated **File cover**, not a simulated view of their contents. Open original displays browser-supported images, PDF and text in a new tab; native design formats download for opening in their desktop application. Original file copies up to 50 MiB are retained in IndexedDB when storage permits. Larger files are available during the current session and may need to be selected again after reload. The browser cannot silently scan folders or launch arbitrary installed applications.
 
 ## Run and check
 
@@ -51,7 +51,9 @@ No API keys or environment variables are required for this prototype.
 
 Email and Google sign-in are interaction demos, not real authentication, account isolation or cloud synchronization. The email flow uses the displayed demo code `123456`.
 
-AI suggestions are deterministic metadata heuristics; no AI API or file-content understanding is connected. A suspected copy is not verified by comparing bytes. Comparison surfaces previews, dates, sizes and recommendations for the user to assess.
+The welcome page introduces the purpose of FILEO. New projects offer an optional preference step with presets and custom tags. Edit these through the avatar for the current project. Applicable goals update recommendations across both modes without changing user decisions or history. Click a suggestion badge in either list to see its evidence. In previews, review and comparison, evidence tags are visible and the full explanation is collapsed by default.
+
+Suggestions use deterministic local rules; no model API is connected. Demo evidence is authored from the actual example artwork. Local recommendations use file metadata and project preferences. A suspected copy is not verified by comparing bytes. Comparison surfaces previews, dates, sizes and recommendations for the user to assess.
 
 All workspace data stays in this browser: metadata and decisions use localStorage (`fileo-workspace-v2`), while image previews and eligible originals use IndexedDB. Clearing browser data removes the workspace. Keep, Archive and Trash update the prototype catalog only: **source files are never modified or deleted from disk**. “Potential to clear” is an estimate, not a claim that physical disk space has been freed.
 
@@ -59,6 +61,6 @@ All workspace data stays in this browser: metadata and decisions use localStorag
 
 The custom FILEO symbol and wordmark are reusable SVGs in `dist/assets/`. Space Grotesk is self-hosted with its SIL Open Font License in `dist/assets/fonts/`.
 
-`landscape.webp`, `chair.webp` and `sculpture.webp` were generated for this project. Other sample file artwork is composed in the interface. The floating-card concept was inspired by the user-supplied reference [ramp.design](https://ramp.design/).
+`landscape.webp`, `chair.webp` and `sculpture.webp` were generated for this project. The new nora-oak-final.webp was generated using the built-in image generator: a photoreal studio product render of a sage-upholstered lounge chair with continuous bent-oak arms and a four-leg base, centered on a warm neutral backdrop, without text. Document and design examples under dist/assets/previews/ are original vector artwork. The floating-card concept was inspired by the user-supplied reference [ramp.design](https://ramp.design/).
 
 Photoshop, Illustrator, Figma, Blender and Premiere Pro marks come from [Devicon](https://github.com/devicons/devicon) (MIT; brand marks remain their owners' property). The Rhino mark comes from [Robert McNeel & Associates](https://www.rhino3d.com/reseller/graphics/); Rhinoceros is its registered trademark. InDesign is represented by its familiar Id badge. These marks identify example file formats and imply no affiliation.

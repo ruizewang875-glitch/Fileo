@@ -1,5 +1,6 @@
 import {TYPES,FILES} from './data.js';
 import {art} from './art.js';
+import {fileCover} from './document-previews.js';
 export function createCarousel({onSelect,isEnabled=()=>true,autoplay=true,getFiles}){
  const stage=document.querySelector('#stage'),pool=document.querySelector('#card-pool'),playback=document.querySelector('#playback');
  const reduced=matchMedia('(prefers-reduced-motion: reduce)'),mod=(n,m)=>(n%m+m)%m;
@@ -7,7 +8,9 @@ export function createCarousel({onSelect,isEnabled=()=>true,autoplay=true,getFil
  let width=0,height=0,cardWidth=0,cardHeight=0,lastTime=performance.now(),lastAdvance=lastTime,activeIndex=-1,wheelAt=-1000,suppressClickUntil=0;
  const cards=[],status=document.querySelector('#carousel-status'),controls=[...stage.querySelectorAll('.stage-control')];
  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const iconKinds=new Set(TYPES.map(file=>file.kind));
+ const assetIcons=new Set(['photoshop','rhino','illustrator','blender','figma','premierepro']);
+ const formatLabels={indesign:'Id',word:'W',powerpoint:'P',excel:'X',plaintext:'Txt',sourcecode:'{ }',pdf:'PDF',png:'PNG',jpeg:'JPG'};
+ const iconKinds=new Set([...assetIcons,...Object.keys(formatLabels)]);
  let entries=[];
  function timestamp(value){const result=typeof value==='number'?value:Date.parse(value);return Number.isFinite(result)?result:0;}
  function readEntries(){
@@ -24,7 +27,7 @@ export function createCarousel({onSelect,isEnabled=()=>true,autoplay=true,getFil
   }
   return [...grouped.values()];
  }
- function nativeTile(file){return `<div class="native-preview" aria-hidden="true"><span class="native-file-icon">${escape(file.ext)}</span></div>`;}
+ function nativeTile(file){const cover=fileCover(file);return `<img src="${escape(cover.src)}" alt="${escape(cover.alt)}" draggable="false">`;}
  function fillCard(card,absoluteIndex){
   const i=mod(absoluteIndex,entries.length),entry=entries[i],file=entry.file;card.dataset.absolute=absoluteIndex;
   if(card.dataset.file===String(i))return;
@@ -32,7 +35,7 @@ export function createCarousel({onSelect,isEnabled=()=>true,autoplay=true,getFil
   const preview=typeof file.previewData==='string'&&/^(data:image\/(?:png|jpe?g|webp|gif|avif|bmp);base64,|blob:)/i.test(file.previewData)?file.previewData:'';
   const artwork=preview?`<img src="${escape(preview)}" alt="Preview of ${escape(file.file)}" draggable="false">`:entry.demo?art(file):nativeTile(file);
   const kind=iconKinds.has(file.kind)?file.kind:'generic';
-  const badge=kind==='indesign'?'Id':kind!=='generic'?`<img src="assets/${kind}.svg" alt="${escape(file.app)}" draggable="false">`:'<svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="#eee4f3" stroke-width="1.5" aria-hidden="true"><path d="M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6 M9 16h6"/></svg>';
+  const badge=formatLabels[kind]|| (assetIcons.has(kind)?`<img src="assets/${kind}.svg" alt="${escape(file.app)}" draggable="false">`:'<svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="#eee4f3" stroke-width="1.5" aria-hidden="true"><path d="M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6 M9 16h6"/></svg>');
   card.innerHTML=`<div class="card-surface"><div class="card-art">${artwork}</div><span class="app-badge ${kind}">${badge}</span><span class="file-ext">${escape(file.ext)}</span><div class="card-caption"><h2>${escape(file.file||file.name||file.app)}</h2><span class="caption-arrow" aria-hidden="true">↗</span></div><div class="card-shine"></div></div>`;
   if(preview)card.querySelector('.card-art>img').addEventListener('error',()=>{card.querySelector('.card-art').innerHTML=nativeTile(file);},{once:true});
  }

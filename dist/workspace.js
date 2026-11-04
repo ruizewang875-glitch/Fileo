@@ -1,4 +1,5 @@
-import {FILES, TYPES} from './data.js';
+import {FILES, typeForExtension} from './data.js';
+import {assessRecommendation, PREFERENCE_PRESETS} from './recommendation.js';
 
 // The prototype stores a catalog, never modifies source files on disk.
 const KEY = 'fileo-workspace-v2';
@@ -7,16 +8,30 @@ const DECISIONS = new Set(['pending', 'keep', 'archive', 'trash']);
 const SORTS = new Set(['modified', 'name', 'size']);
 const MODES = new Set(['quick', 'explore']);
 const DEMO_PROJECT = 'Studio semester';
+const DEMO_FILES = new Map(FILES.map(f=>[f.id,f]));
 const LEGACY_DEMO_IMAGES = Object.freeze({'landscape.png':'landscape.webp','chair.png':'chair.webp','sculpture.png':'sculpture.webp'});
 const PROVIDERS = new Set(['email', 'google', 'demo']);
 const PREVIEW_STATUSES = new Set(['ready', 'unsupported', 'unreadable', 'not-image']);
 const DAY = 86400000;
 const clone = value => JSON.parse(JSON.stringify(value));
 const cleanText = (value, limit = 300) => typeof value === 'string' ? value.trim().slice(0, limit) : '';
+// Store tags independently from files so a new project's goals can be set before importing.
+export function normalizePreferenceTags(values) {
+ if (!Array.isArray(values)) return [];
+ const tags=[],seen=new Set();
+ for(const value of values){
+  if(typeof value!=='string')continue;
+  const clean=Array.from(value.normalize('NFKC').replace(/[\u0000-\u001f\u007f]/g,' ').replace(/\s+/gu,' ').trim()).slice(0,48).join('').trim();
+  const key=clean.toLowerCase();if(!key||seen.has(key))continue;
+  seen.add(key);tags.push(PREFERENCE_PRESETS.find(tag=>tag.toLowerCase()===key)||clean);
+  if(tags.length===12)break;
+ }
+ return tags;
+}
 const validEmail = value => typeof value === 'string' && value.trim().length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) ? value.trim().toLowerCase() : '';
 const returnRoute = value => typeof value === 'string' && value.length <= 2048 && /^#(?:files|projects|dashboard|activity|quick|explore|browse)?(?:\?[^<>]*)?$/.test(value) ? value : '#files';
 const freshReview = () => ({ids:[],cursor:0,returnTo:'#files',deferred:[]});
-const fresh = () => ({version:2, session:{signedIn:false,name:'Designer',email:'',provider:'demo',authMode:'prototype',sort:'modified',autoplay:true,mode:'quick',project:''},files:[],history:[],analysis:{status:'idle',step:0,ids:[]},review:freshReview(),resumeId:null,saved:[],recent:[],storageError:false});
+const fresh = () => ({version:2, session:{signedIn:false,name:'Designer',email:'',provider:'demo',authMode:'prototype',sort:'modified',autoplay:true,mode:'quick',project:''},projectPreferences:Object.create(null),files:[],history:[],analysis:{status:'idle',step:0,ids:[]},review:freshReview(),resumeId:null,saved:[],recent:[],storageError:false});
 const snapshot = file => ({id:file.id,decision:file.decision,clarification:clone(file.clarification),revision:file.revision});
 const sameResult = (a,b) => !!a&&!!b&&a.decision===b.decision&&JSON.stringify(a.clarification??null)===JSON.stringify(b.clarification??null);
 const sampleReasons = {
@@ -39,22 +54,58 @@ function previewFields(raw) {
  if(typeof raw.previewVolatile==='boolean')result.previewVolatile=raw.previewVolatile;
  return result;
 }
-function restoreState(raw) {
+function recommendationBaseline(file) {
+ const baseBucket=BUCKETS.has(file.baseBucket)?file.baseBucket:file.bucket;
+ return {baseBucket,baseReason:cleanText(file.baseReason,4000)||cleanText(file.reason,4000)||sampleReasons[baseBucket]};
+}
+function makeDemoRecord(sample,now){
+ const baseReason=sampleReasons[sample.bucket];
+ return {...clone(sample),collection:sample.project,project:DEMO_PROJECT,decision:'pending',clarification:null,revision:0,source:'demo',baseBucket:sample.bucket,baseReason,reason:baseReason,importedAt:now};
+}
+function refreshRecommendations(state,clock,projects=null){
+ const groups=new Map();
+ for(const file of state.files){
+  if(projects&&!projects.has(file.project))continue;
+  if(!groups.has(file.project))groups.set(file.project,[]);
+  groups.get(file.project).push(file);
+ }
+ for(const [project,files] of groups){
+  const tags=state.projectPreferences[project]||[];
+  const results=files.map(file=>assessRecommendation(file,{files,tags,now:clock}));
+  files.forEach((file,i)=>{const result=results[i];file.bucket=result.bucket;file.reason=result.reason;file.reasonTags=[...result.tags];});
+ }
+}
+function restoreState(raw,clock) {
  const state=fresh();
  if (!raw || raw.version!==2 || !Array.isArray(raw.files)) return state;
  const session=raw.session||{};
  state.session={signedIn:session.signedIn===true,name:cleanText(session.name,40)||'Designer',email:validEmail(session.email),provider:PROVIDERS.has(session.provider)?session.provider:'demo',authMode:'prototype',sort:SORTS.has(session.sort)?session.sort:'modified',autoplay:session.autoplay!==false,mode:MODES.has(session.mode)?session.mode:'quick',project:cleanText(session.project,300)};
+ if(raw.projectPreferences&&typeof raw.projectPreferences==='object'&&!Array.isArray(raw.projectPreferences)){
+  for(const [name,values] of Object.entries(raw.projectPreferences)){
+   const project=cleanText(name,300),tags=normalizePreferenceTags(values);
+   if(project&&tags.length)state.projectPreferences[project]=tags;
+  }
+ }
  const seen=new Set();
  for (const f of raw.files) {
   if (!f || typeof f.id!=='string' || seen.has(f.id) || typeof f.file!=='string' || !BUCKETS.has(f.bucket) || !Number.isFinite(f.size) || f.size<0) continue;
   const record={...f,project:cleanText(f.project,300)||'Imported files',decision:DECISIONS.has(f.decision)?f.decision:'pending',clarification:safeClarification(f.clarification),revision:Number.isSafeInteger(f.revision)&&f.revision>=0?f.revision:0,source:f.source==='demo'?'demo':'local'};
-  if (record.source==='local') delete record.image;
-  if (record.source==='demo') {
-   record.reason=sampleReasons[record.bucket];
+  if(record.source==='local'){
+   delete record.image;
+   const type=typeForExtension(record.ext);
+   if(type){record.type=type.id;record.kind=type.kind;record.app=type.app;record.category=type.category;}
+   Object.assign(record,recommendationBaseline(record));
+  }else{
+   const sample=DEMO_FILES.get(record.id);
+   if(sample){
+    // Refresh authored metadata and preview references, never review or action state.
+    const project=record.project===sample.project?DEMO_PROJECT:record.project;
+    Object.assign(record,sample,{project,collection:sample.project,baseBucket:sample.bucket,baseReason:sampleReasons[sample.bucket]});
+   }else Object.assign(record,recommendationBaseline(record));
    if(Object.hasOwn(LEGACY_DEMO_IMAGES,record.image))record.image=LEGACY_DEMO_IMAGES[record.image];
   }
   for(const field of ['previewData','previewKey','previewStatus','previewError','previewVolatile','width','height'])delete record[field];
-  Object.assign(record,previewFields(f));
+  Object.assign(record,previewFields(record.source==='demo'&&DEMO_FILES.has(record.id)?DEMO_FILES.get(record.id):f));
   seen.add(f.id);state.files.push(record);
  }
  state.session.project=state.files.some(f=>f.project===state.session.project)?state.session.project:(state.files[0]?.project||'');
@@ -76,6 +127,12 @@ function restoreState(raw) {
    return recovered?{id,decision:recovered.decision,clarification:safeClarification(recovered.clarification),revision:recovered.revision}:null;
   }).filter(Boolean);
  }
+ // Extend only a previously loaded sample project. Do not attach samples to personal imports,
+ // reset a paused scan, or add new files to an existing review queue.
+ if(state.files.some(f=>f.source==='demo'&&f.project===DEMO_PROJECT&&DEMO_FILES.has(f.id))){
+  for(const file of FILES){if(!seen.has(file.id))state.files.push(makeDemoRecord(file,clock));}
+ }
+ refreshRecommendations(state,clock);
  return state;
 }
 function metadataRecommendation(descriptor, clock) {
@@ -93,8 +150,8 @@ export function createWorkspace(options={}) {
  const now=typeof options.now==='function'?options.now:()=>Date.now();
  let state=fresh(),serial=0;
  const listeners=new Set();
- try {const raw=storage?.getItem(KEY);if(raw)state=restoreState(JSON.parse(raw));} catch {state.storageError=true;}
  const timestamp=()=>{const n=Number(now());return Number.isFinite(n)?n:Date.now();};
+ try {const raw=storage?.getItem(KEY);if(raw)state=restoreState(JSON.parse(raw),timestamp());} catch {state.storageError=true;}
  const uid=prefix=>`${prefix}-${timestamp().toString(36)}-${globalThis.crypto?.randomUUID?.()||(++serial).toString(36)+'-'+Math.random().toString(36).slice(2,9)}`;
  const getState=()=>clone(state);
  const emit=()=>{for(const fn of listeners){try{fn(getState());}catch(error){console.error('FILEO workspace listener failed',error);}}};
@@ -106,6 +163,7 @@ export function createWorkspace(options={}) {
  function addRecords(records, skipped) {
   if(!records.length)return {added:0,skipped,ids:[]};
   state.files.push(...records);
+  refreshRecommendations(state,timestamp(),new Set(records.map(f=>f.project)));
   if(!state.files.some(f=>f.project===state.session.project))state.session.project=records[0].project;
   const ids=records.map(f=>f.id);
   state.analysis={status:'pending',step:0,ids:[...new Set([...(state.analysis.status==='pending'?state.analysis.ids:[]),...ids])]};
@@ -148,6 +206,16 @@ export function createWorkspace(options={}) {
    if(project&&state.files.some(f=>f.project===project))state.session.project=project;
    persist();
   },
+  getProjectPreferences(value=state.session.project){
+   return [...(state.projectPreferences[cleanText(value,300)]||[])];
+  },
+  setProjectPreferences(value,values){
+   const project=cleanText(value,300);if(!project||!Array.isArray(values))return [];
+   const tags=normalizePreferenceTags(values),previous=state.projectPreferences[project]||[];
+   if(tags.length===previous.length&&tags.every((tag,i)=>tag===previous[i]))return [...tags];
+   if(tags.length)state.projectPreferences[project]=tags;else delete state.projectPreferences[project];
+   refreshRecommendations(state,timestamp(),new Set([project]));persist();return [...tags];
+  },
   setProject(value){
    const project=cleanText(value,300);
    if(!project||!state.files.some(f=>f.project===project))return false;
@@ -157,9 +225,9 @@ export function createWorkspace(options={}) {
    const existing=new Set(state.files.filter(f=>f.source==='demo').map(f=>f.id));
    for(const file of state.files.filter(f=>f.source==='demo')){file.collection=file.collection||file.project;file.project=DEMO_PROJECT;}
    state.session.project=DEMO_PROJECT;
-   const records=FILES.filter(f=>!existing.has(f.id)).map(f=>({...clone(f),collection:f.project,project:DEMO_PROJECT,decision:'pending',clarification:null,revision:0,source:'demo',reason:sampleReasons[f.bucket],importedAt:timestamp()}));
+   const records=FILES.filter(f=>!existing.has(f.id)).map(f=>makeDemoRecord(f,timestamp()));
    const result=addRecords(records,FILES.length-records.length);
-   if(!records.length)persist();
+   if(!records.length){refreshRecommendations(state,timestamp(),new Set([DEMO_PROJECT]));persist();}
    return result;
   },
   importFiles(descriptors,{project:requestedProject}={}){
@@ -184,9 +252,9 @@ export function createWorkspace(options={}) {
      }
      continue;
     }
-    const extension=name.includes('.')?name.slice(name.lastIndexOf('.')).toLowerCase():'',type=TYPES.find(t=>t.ext===extension),clock=timestamp(),recommendation=metadataRecommendation({name,lastModified:modified},clock);
+    const extension=name.includes('.')?name.slice(name.lastIndexOf('.')).toLowerCase():'',type=typeForExtension(extension),clock=timestamp(),recommendation=metadataRecommendation({name,lastModified:modified},clock);
     const imageMime=/^image\//.test(raw.type||'')||/\.(?:jpe?g|png|webp|gif|avif|bmp|svg|tiff?|heic|heif)$/i.test(name);
-    const record={id:uid('local'),file:name,name:name.replace(/\.[^.]+$/,'').replaceAll('_',' '),ext:extension||'file',type:type?.id||extension.slice(1)||'other',kind:type?.kind||'generic',app:type?.app||(imageMime?'Image':extension==='.pdf'?'PDF document':'File'),category:type?.category||(imageMime?'Images':'Documents'),tags:`${extension.slice(1)} ${imageMime?'image photo picture':''}`,project,modified:new Date(modified||clock).toISOString().slice(0,10),lastModified:modified,size:bytes/1000000,bytes,status:'work',forgotten:modified>0&&clock-modified>180*DAY,...recommendation,decision:'pending',clarification:null,revision:0,source:'local',path,fingerprint,importedAt:clock};
+    const record={id:uid('local'),file:name,name:name.replace(/\.[^.]+$/,'').replaceAll('_',' '),ext:extension||'file',type:type?.id||extension.slice(1)||'other',kind:type?.kind||'generic',app:type?.app||(imageMime?'Image':extension==='.pdf'?'PDF document':'File'),category:type?.category||(imageMime?'Images':'Documents'),tags:`${extension.slice(1)} ${imageMime?'image photo picture':''}`,project,modified:new Date(modified||clock).toISOString().slice(0,10),lastModified:modified,size:bytes/1000000,bytes,status:'work',forgotten:modified>0&&clock-modified>180*DAY,...recommendation,baseBucket:recommendation.bucket,baseReason:recommendation.reason,decision:'pending',clarification:null,revision:0,source:'local',path,fingerprint,importedAt:clock};
     Object.assign(record,previewFields(raw));
     known.set(projectFingerprint,record);
     records.push(record);
@@ -206,7 +274,7 @@ export function createWorkspace(options={}) {
    const event={id:uid('event'),at:timestamp(),fileIds:files.map(f=>f.id),action:context?'clarify':decision,before:files.map(snapshot),afterRevision:{},undone:false};
    for(const file of files){file.decision=decision;file.clarification=context?clone(context):null;file.revision++;file.updatedAt=event.at;event.afterRevision[file.id]=file.revision;}
    event.after=files.map(snapshot);
-   state.history.unshift(event);chooseNext();persist();return clone(event);
+   state.history.unshift(event);refreshRecommendations(state,timestamp(),new Set(files.map(f=>f.project)));chooseNext();persist();return clone(event);
   },
   canUndo,
   undo(eventId){
@@ -218,7 +286,7 @@ export function createWorkspace(options={}) {
    // Rebase only the immediately preceding active action onto the restored revision.
    // Its original result snapshot remains immutable for the activity timeline.
    for(const file of files){const previous=latestActiveEvent(file.id);if(previous&&sameResult(file,previous.after?.find(a=>a.id===file.id)))previous.afterRevision[file.id]=file.revision;}
-   chooseNext();persist();return clone(restore);
+   refreshRecommendations(state,timestamp(),new Set(files.map(f=>f.project)));chooseNext();persist();return clone(restore);
   },
   setResume(id){if(id===null||state.files.some(f=>f.id===id)){state.resumeId=id;persist();}},
   startReview(ids,{focusId=null,returnTo='#files'}={}){

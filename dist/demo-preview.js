@@ -1,0 +1,43 @@
+// Curated visual evidence for demonstration records. Never substitute an example
+// for a local upload, even if its filename happens to match a sample.
+const rows=[
+ ['alpine_afterglow.psd','landscape.webp','alpine','Sunlit alpine peak','Pink clouds and a golden summit above a dark ridge.'],
+ ['alpine_afterglow_copy.psd','landscape.webp','alpine','Sunlit alpine peak','Pink clouds and a golden summit above a dark ridge.'],
+ ['dawn_grading_v02.psd','previews/dawn-grade.svg','alpine','Two-tone dawn color study','Three layered ridge silhouettes and four printed grading swatches.'],
+ ['nora_lounge_v04.3dm','chair.webp','nora','Burgundy lounge on a chrome frame','Burgundy upholstered seat and back with a tubular chrome frame.'],
+ ['nora_frame_test.3dm','previews/nora-frame.svg','nora','Nora tubular frame study','A bare tubular frame is shown without seat cushions or upholstery.'],
+ ['nora_lounge_final.3dm','nora-oak-final.webp','nora','Sage lounge with a bent oak frame','Sage upholstery and a bent oak frame distinguish this option from the burgundy chrome version.'],
+ ['off_grid_poster.ai','previews/offgrid.svg','offgrid','Off / Grid poster','Oversized red type and three fine, overlapping black orbits.'],
+ ['orbital_marks.ai','previews/orbital.svg','offgrid','Orbital marks contact sheet','Nine different orbit marks are arranged on a registration grid.'],
+ ['off_grid_poster_copy.ai','previews/offgrid.svg','offgrid','Off / Grid poster','Oversized red type and three fine, overlapping black orbits.'],
+ ['soft_collision.blend','sculpture.webp','collision','Interlocked chrome sculpture','A polished intertwined form reflects lilac and copper light.'],
+ ['glass_loop_early.blend','previews/glass-topology.svg','collision','Loop topology study','An unshaded wire mesh shows the topology of a single loop.'],
+ ['soft_collision_backup.blend','sculpture.webp','collision','Interlocked chrome sculpture','A polished intertwined form reflects lilac and copper light.'],
+ ['unwind_explorations.fig','previews/unwind-desktop.svg','unwind','Unwind desktop design','A wide homepage shows the Unwind masthead and a coastal illustration.'],
+ ['unwind_mobile.fig','previews/unwind-mobile.svg','unwind','Unwind mobile screens','Two narrow mobile layouts show a story feed and a reading view.'],
+ ['unwind_components.fig','previews/unwind-kit.svg','unwind','Unwind component library','The sheet contains palette tokens, buttons, switches and type specimens.'],
+ ['field_notes_02.indd','previews/field-02.svg','field','Field notes issue two spread','A two-page editorial spread pairs a contour map with field observations.'],
+ ['field_notes_01.indd','previews/field-01.svg','field','Field notes issue one','An earlier spread contains a botanical plate and labelled specimen illustrations.'],
+ ['field_notes_cover.indd','previews/field-cover.svg','field','Field notes cover design','A full-bleed green cover features cream typography and a contour map.'],
+ ['between_places_edit.prproj','previews/film-edit.svg','film','Edited travel film sequence','A coastal establishing shot sits above a layered video and audio timeline.'],
+ ['alpine_sequence.prproj','previews/film-alpine.svg','film','Alpine shot assembly','An alpine establishing shot appears over a shorter three-clip sequence.'],
+ ['between_places_roughcut.prproj','previews/film-rough.svg','film','Rough cut of the travel film','A road shot and four coarse clips appear on an unpolished timeline.'],
+ ['studio_research_brief.docx','previews/brief.svg','brief','Studio research brief','The brief lists the research question, interview plan and deliverables.'],
+ ['studio_research_outline.doc','previews/outline.svg','brief','Early research outline','The outline has three questions and an unfinished methods section.'],
+ ['studio_research_brief_copy.docx','previews/brief.svg','brief','Studio research brief','The brief lists the research question, interview plan and deliverables.'],
+ ['nora_design_review.pptx','previews/deck-review.svg','deck','Nora design review title slide','A presentation cover combines an isometric chair construction with the review title.'],
+ ['nora_concept_pitch.ppt','previews/deck-pitch.svg','deck','Nora initial concept slide','Three numbered structural options are laid out as a concept pitch.'],
+ ['interview_notes.txt','previews/notes.svg','notes','Studio interview notes','A plain-text transcript excerpt includes a dated observation and follow-up questions.'],
+ ['rename_rules.txl','previews/rules.svg','rules','Filename transformation source','TXL source shows a small token rule and a main transformation.'],
+ ['nora_material_budget.xlsx','previews/budget.svg','budget','Nora material budget','Six material rows show quantity, unit price and a cost total.'],
+ ['nora_cost_estimate.xls','previews/estimate.svg','budget','Early cost estimate','Three initial cost allowances are split across frame, seat and finish.'],
+ ['nora_assembly_sheet.pdf','previews/assembly.svg','nora','Nora assembly sheet','A numbered line drawing separates the back, seat and frame for assembly.'],
+ ['field_catalogue.pdf','previews/catalogue.svg','field','Field notes catalogue','The catalogue index lists three terrains with small map plates.'],
+ ['nora_exploded_view.png','previews/exploded.svg','nora','Nora exploded parts diagram','Two upholstered pads float above a tubular frame in an exploded diagram.'],
+ ['off_grid_lockup.png','previews/lockup.svg','offgrid','Off / Grid horizontal wordmark','A wide black wordmark pairs with a red registration symbol.'],
+ ['material_study.jpg','sculpture.webp','material-photo','Studio material photograph','A reflective loop is photographed in a lilac and copper studio setting.'],
+ ['material_study_copy.jpg','sculpture.webp','material-photo','Studio material photograph','A reflective loop is photographed in a lilac and copper studio setting.'],
+ ['north_ridge.jpeg','landscape.webp','ridge-photo','North ridge field photograph','A wide alpine view records the final light on the summit.']
+];
+const byName=new Map(rows.map(([name,path,family,alt,detail])=>[name,Object.freeze({src:'assets/'+path,path,key:path,family,alt,detail})]));
+export function demoPreview(file){return !file||file.source==='local'?null:byName.get(file.file)||null;}

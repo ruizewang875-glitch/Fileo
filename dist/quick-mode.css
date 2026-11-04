@@ -129,6 +129,7 @@
 .qc-preview-caption p{margin:0;font-size:12px;color:#a18baa;line-height:1.5}
 .qc-preview-caption p>span{padding:0 7px;color:#bfacbf}
 .qc-preview-caption>.ai-badge{font-size:11px;flex-shrink:0;margin-top:1px}
+.qc-preview-insight{margin:15px 0 4px;min-width:0}
 .qc-preview-controls{display:flex;align-items:center;justify-content:center;gap:25px;margin:18px 0}
 .qc-preview-select{display:flex;align-items:center;gap:8px;font-size:13px;color:#8f739c;cursor:pointer}
 .qc-preview-actions{display:flex;align-items:center;gap:9px;padding-top:18px;border-top:1px solid #e6dce9}

@@ -1,3 +1,4 @@
+import {suggestionBadge,recommendationDetails} from './recommendation-ui.js';
 import {BUCKETS, formatStorage, searchFiles} from './data.js';
 import {rankFiles} from './mode-model.js';
 import {ringSegmentPath} from './dashboard.js';
@@ -48,13 +49,17 @@ export function createQuickMode({root,getFiles,getState,thumb,badge,fileArt,hydr
  function renderPreview(){
   const all=files(),f=all.find(item=>item.id===previewIds[previewIndex]);if(!f){dialog.close();return;}
   const current=choiceFiles();
+  const keepReasonOpen=dialog.open&&dialog.dataset.fileId===f.id&&!!dialog.querySelector('.qc-preview-insight details[open]');
+  dialog.dataset.fileId=f.id;
   dialog.innerHTML=`<div class="qc-preview-top"><span>${previewBatch?'Check selection':'Quick preview'}${previewIds.length>1?` <b>${previewIndex+1} / ${previewIds.length}</b>`:''}</span><button type="button" class="qc-icon" data-close aria-label="Close preview">×</button></div>
    <div class="qc-preview-art">${fileArt(f)}</div>
    <div class="qc-preview-caption"><div><h2 id="qc-preview-name">${esc(f.file)}</h2><p>${esc(f.app||f.ext)} <span>·</span> ${esc(prettySize(f))} <span>·</span> ${esc(f.modified||'')}</p></div>${badge(f)}</div>
+   <div class="qc-preview-insight">${recommendationDetails(f,{showBadge:false})}</div>
    <div class="qc-preview-controls"><button type="button" class="qc-icon" data-prev aria-label="Previous preview" ${previewIndex===0?'disabled':''}>←</button>
     <label class="qc-preview-select"><input type="checkbox" data-preview-select ${selected.has(f.id)?'checked':''} ${!selectable(f)?'disabled':''}><span>${!selectable(f)?'In Trash':'Select this file'}</span></label>
     <button type="button" class="qc-icon" data-next aria-label="Next preview" ${previewIndex>=previewIds.length-1?'disabled':''}>→</button></div>
    <div class="qc-preview-actions"><span>${previewBatch?`${current.length} selected · ${formatStorage(current.reduce((n,item)=>n+item.size,0))}`:esc(decisionName[f.decision]||'To review')}</span><button type="button" class="qc-button" data-archive ${previewBatch?!current.length?'disabled':'':!selectable(f)?'disabled':''}>${previewBatch?'Archive selected':'Archive'}</button><button type="button" class="qc-button qc-primary" data-trash ${previewBatch?!current.length?'disabled':'':!selectable(f)?'disabled':''}>${previewBatch?'Trash selected':'Move to Trash'}</button></div>`;
+  if(keepReasonOpen)dialog.querySelector('.qc-preview-insight details')?.setAttribute('open','');
   hydrateArt?.(dialog.querySelector('.qc-preview-art'),f);
   dialog.querySelector('[data-close]').onclick=()=>dialog.close();
   dialog.querySelector('[data-prev]').onclick=()=>{if(previewIndex>0){previewIndex--;renderPreview();}};
@@ -81,7 +86,7 @@ export function createQuickMode({root,getFiles,getState,thumb,badge,fileArt,hydr
     <input type="checkbox" data-qc-select="${esc(f.id)}" aria-label="Select ${esc(f.file)}" ${chosen?'checked':''} ${!selectable(f)?'disabled':''}>
     <span class="qc-rank ${rank?'top-rank':''}" aria-label="${rank?`Cleanup priority ${rank}`:'Reviewed or lower priority'}">${rank?`0${rank}`:'—'}</span>
     <button type="button" class="qc-file" data-qc-preview="${esc(f.id)}" aria-label="Preview ${esc(f.file)}"><span class="qc-thumbnail">${thumb(f)}</span><span><strong>${esc(f.file)}</strong><small>${completed?esc(decisionName[f.decision]):rank?'Priority review':esc(f.app||f.ext)}</small></span></button>
-    <div class="qc-recommendation">${badge(f)}</div><span class="qc-size">${esc(prettySize(f))}</span><span class="qc-modified">${esc(f.modified||'')}</span>
+    <div class="qc-recommendation">${suggestionBadge(f,{interactive:true})}</div><span class="qc-size">${esc(prettySize(f))}</span><span class="qc-modified">${esc(f.modified||'')}</span>
     <button type="button" class="qc-icon qc-row-preview" data-qc-preview="${esc(f.id)}" aria-label="Quick preview ${esc(f.file)}">↗</button>
    </div>`;
   }).join(''):`<div class="qc-empty"><span>Nothing here yet.</span><button type="button" class="qc-button" data-show-all>Show all files</button></div>`;

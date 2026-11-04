@@ -1,5 +1,7 @@
 # FILEO preview inspection
 
+> This audit records the full-file previews and the previous complete-image card layout. Explore now uses separate full-bleed covers. The source dimensions and Quick Clear measurements below still apply to actual file previews.
+
 Every sample was rendered and reviewed. Independently, the desktop prototype was opened and measured for every Quick Clear thumbnail, quick preview and Explore grid card. All 15 carousel representatives were also loaded and checked for artwork fit and clear space for the software icon and filename.
 
 The sizes below are the actual image rectangles in the tested desktop quick-preview dialog, rounded to the nearest CSS pixel. All 37 decoded images retained their original proportions (within 1.1 pixels of subpixel rounding), fitted inside the frame, and passed the corresponding list and grid checks. Decorative folios and top rules were removed. Document text, sheet rows, diagram callouts, and video timelines are part of the files themselves. The outer contours on the Field Notes cover were moved inside its source canvas.

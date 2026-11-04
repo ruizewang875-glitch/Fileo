@@ -2,7 +2,7 @@
    track beyond its frame (especially the previously clipped Quick preview). */
 :root{--file-mat:#f0edf1;--preview-max-height:min(51svh,460px)}
 
-:is(.card-art,.qc-thumbnail,.explore-art,.explore-mini,.queue-thumbnail,.activity-event-thumbnail,.review-art,.preview-art,.file-cover-art)>img{
+:is(.qc-thumbnail,.explore-art,.explore-mini,.queue-thumbnail,.activity-event-thumbnail,.review-art,.preview-art,.file-cover-art)>img{
   display:block;min-width:0;min-height:0;max-width:100%;max-height:100%;
   width:100%;height:100%;object-fit:contain;object-position:center;
 }
@@ -10,12 +10,14 @@
   grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);background:var(--file-mat);
 }
 
-/* The floating paper has three safe areas: software badge, artwork, filename.
-   Keep both overlays outside the image while using the space between them. */
-.file-card .card-surface,.file-card .card-art{background:var(--file-mat)}
-.file-card .card-art{display:grid;grid-template: minmax(0,1fr) / minmax(0,1fr);padding:64px 6px 4px;bottom:50px}
-.file-card .card-art>img{object-fit:contain}
-.file-card .file-ext{color:#61526b;background:#fffc;border-color:#dcd4df}
+/* Browse covers run beneath their badges and captions. Opened files below
+   retain the uncropped original; a cover can have its own composition. */
+.file-card .card-surface,.file-card .card-art{background:#302838}
+.file-card .card-art{inset:0;display:block;padding:0}
+.file-card .card-art>img{display:block;width:100%;height:100%;max-width:none;max-height:none;object-fit:cover;object-position:var(--cover-focus,50% 50%)}
+.file-card .card-art::after{content:"";position:absolute;inset:52% 0 0;pointer-events:none;background:linear-gradient(to bottom,transparent 0%,#19131e13 26%,#19131e94 70%,#19131eda 100%)}
+.file-card .card-caption{z-index:2;background:transparent;backdrop-filter:none;border:0;color:#fff;text-shadow:0 1px 3px #161018a6}
+.file-card .file-ext{color:#fff;background:#201923ae;border-color:#ffffff56}
 
 /* Natural-ratio artwork in large previews avoids a panoramic strip for a
    square product rendering and keeps a whole slide/page visible at once. */
@@ -35,17 +37,18 @@
 }
 :is(.qc-preview-art,.preview-art)>.file-cover-art{width:100%;max-width:none;height:100%}
 
-.explore-card-image{height:auto;aspect-ratio:4/3;background:var(--file-mat)}
-.explore-card-art>img,.review-art>img{object-fit:contain}
+.explore-card-image{height:auto;aspect-ratio:4/3;background:#302838}
+.explore-card-art{padding:0}
+.explore-card-art>img,.explore-card-art>.file-cover-art>img{object-fit:cover;object-position:var(--cover-focus,50% 50%)}
+.review-art>img{object-fit:contain}
 .explore-detail-art,.explore-compare-art,.review-art{background:var(--file-mat)}
 :is(.explore-detail-art,.explore-compare-art)>.file-cover-art{max-width:none}
-@media(max-width:700px){.file-card .card-art{padding:49px 4px 3px;bottom:42px}}
 @media(max-height:680px){:root{--preview-max-height:41svh}}
 
 /* Keep the actual pixels out of rounded corners; file controls belong in the
    caption, even for artwork whose content runs right to the edge. */
 :is(.qc-thumbnail,.explore-mini,.queue-thumbnail,.activity-event-thumbnail){padding:3px}
-.explore-card-art,.explore-detail-art,.explore-compare-art,.review-art{padding:6px}
+.explore-detail-art,.explore-compare-art,.review-art{padding:6px}
 :is(.qc-preview-art,.preview-art):has(>img){padding:4px}
 .preview-dialog>.close-button{position:relative;inset:auto;display:grid;place-items:center;width:32px;height:32px;margin:8px 12px 5px auto}
 .explore-entry-row{display:flex;align-items:center;gap:8px;min-width:0}

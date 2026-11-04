@@ -1,3 +1,4 @@
+import {exploreCover} from './explore-cover.js';
 import {suggestionBadge,recommendationDetails} from './recommendation-ui.js';
 import { TYPES, BUCKETS, searchFiles } from './data.js';
 
@@ -26,7 +27,11 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
     return found.sort((a,b)=>view==='recent'?(state.recent||[]).indexOf(a.id)-(state.recent||[]).indexOf(b.id):(a.decision==='trash')-(b.decision==='trash')||b.modified.localeCompare(a.modified)||a.file.localeCompare(b.file));
   };
   const q=selector=>root.querySelector(selector);
-  const cardArt=f=>fileArt(f).replace(/<button\b[^>]*data-repair=[\s\S]*?<\/button>/gi,'');
+  const cardArt=f=>{
+    const cover=exploreCover(f);
+    if(cover)return `<img src="${esc(cover.src)}" alt="${esc(cover.alt)}" style="--cover-focus:${esc(cover.focus)}" draggable="false">`;
+    return fileArt(f).replace(/<button\b[^>]*data-repair=[\s\S]*?<\/button>/gi,'');
+  };
 
   root.classList.add('explore-workspace');
   root.innerHTML=`<div class="explore-top"><button class="explore-back" type="button">← Explore</button><form class="explore-search" role="search">${icon('search')}<input type="search" placeholder="Find a file…" aria-label="Search project files"><button type="submit" aria-label="Search project files">↗</button></form></div>

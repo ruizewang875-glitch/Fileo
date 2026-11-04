@@ -1,6 +1,6 @@
 # FILEO preview inspection
 
-> This audit records the full-file previews and the previous complete-image card layout. Explore now uses separate full-bleed covers. The source dimensions and Quick Clear measurements below still apply to actual file previews.
+> This audit records the full-file previews and the previous complete-image card layout. Only the Explore home type carousel uses separate full-bleed covers. The per-file grid again uses the same complete source image as the detail view. The source dimensions and Quick Clear measurements below still apply to actual file previews.
 
 Every sample was rendered and reviewed. Independently, the desktop prototype was opened and measured for every Quick Clear thumbnail, quick preview and Explore grid card. All 15 carousel representatives were also loaded and checked for artwork fit and clear space for the software icon and filename.
 

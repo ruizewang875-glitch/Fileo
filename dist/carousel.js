@@ -1,5 +1,6 @@
 import {TYPES,FILES} from './data.js';
-import {exploreCover} from './explore-cover.js';
+import {typeCarouselCover} from './explore-cover.js';
+import {art} from './art.js';
 import {fileCover} from './document-previews.js';
 export function createCarousel({onSelect,isEnabled=()=>true,autoplay=true,getFiles}){
  const stage=document.querySelector('#stage'),pool=document.querySelector('#card-pool'),playback=document.querySelector('#playback');
@@ -33,8 +34,8 @@ export function createCarousel({onSelect,isEnabled=()=>true,autoplay=true,getFil
   if(card.dataset.file===String(i))return;
   card.dataset.file=i;card.dataset.type=entry.type;card.setAttribute('aria-label',`Browse ${file.app} files, ${file.ext}`);
   const preview=typeof file.previewData==='string'&&/^(data:image\/(?:png|jpe?g|webp|gif|avif|bmp);base64,|blob:)/i.test(file.previewData)?file.previewData:'';
-  const cover=entry.demo?exploreCover(file,{typeCard:true}):null;card.style.setProperty('--cover-focus',cover?.focus||'50% 50%');
-  const artwork=preview?`<img src="${escape(preview)}" alt="Preview of ${escape(file.file)}" draggable="false">`:cover?`<img src="${escape(cover.src)}" alt="${escape(cover.alt)}" draggable="false">`:nativeTile(file);
+  const cover=entry.demo&&document.body.dataset.page==='explore'?typeCarouselCover(file):null;card.style.setProperty('--cover-focus',cover?.focus||'50% 50%');
+  const artwork=preview?`<img src="${escape(preview)}" alt="Preview of ${escape(file.file)}" draggable="false">`:cover?`<img src="${escape(cover.src)}" alt="${escape(cover.alt)}" draggable="false">`:entry.demo?art(file):nativeTile(file);
   const kind=iconKinds.has(file.kind)?file.kind:'generic';
   const badge=kind==='indesign'?'Id':(assetIcons.has(kind)?`<img src="assets/${kind}.svg" alt="${escape(markNames[kind]||file.app)}" draggable="false">`:'<svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="#eee4f3" stroke-width="1.5" aria-hidden="true"><path d="M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6 M9 16h6"/></svg>');
   card.innerHTML=`<div class="card-surface"><div class="card-art">${artwork}</div><span class="app-badge ${kind}">${badge}</span><span class="file-ext">${escape(file.ext)}</span><div class="card-caption"><h2>${escape(file.file||file.name||file.app)}</h2><span class="caption-arrow" aria-hidden="true">↗</span></div><div class="card-shine"></div></div>`;

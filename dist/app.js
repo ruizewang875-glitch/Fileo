@@ -127,6 +127,7 @@ function syncContext(){
 function renderRoute(){
  clearTimeout(analysisTimer);routeGeneration++;closeDialogs();route={...readRoute()};
  const alias={files:'browse',projects:'explore',dashboard:'quick',activity:state().session.mode};
+ if(route.type==='txl'&&currentFiles().some(f=>f.source==='demo'&&f.type==='jsonl')&&!currentFiles().some(f=>f.type==='txl'))route.type='jsonl';
  const wantsHistory=route.page==='activity';if(alias[route.page])route.page=alias[route.page];
  if(!['home','quick','explore','browse','import','analysis','review'].includes(route.page))route.page='home';
  let authTarget=null;

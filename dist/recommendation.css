@@ -10,7 +10,7 @@
 .rec-disclosure>summary{display:flex;align-items:center;justify-content:space-between;list-style:none;gap:12px;min-height:34px;cursor:pointer;border-radius:5px}
 .rec-disclosure>summary::-webkit-details-marker{display:none}
 .rec-tags{display:inline-flex;align-items:center;flex-wrap:wrap;gap:5px;min-width:0}
-.rec-tag{display:inline-flex;align-items:center;min-height:24px;max-width:100%;padding:3px 8px;border:1px solid #ac99bc;border-radius:6px;background-color:#d9c7e6;background-image:radial-gradient(ellipse at 10% 0%,#ffedf3a8,transparent 58%),linear-gradient(112deg,#edbbce 0%,#d4bde8 43%,#c4c9ea 70%,#afd5d8 100%);color:#382843;box-shadow:inset 0 1px 0 #ffffff70;font:500 12px/1.35 "FILEO Grotesk",sans-serif;overflow-wrap:anywhere}
+.rec-tag{display:inline-flex;align-items:center;min-height:24px;max-width:100%;padding:3px 8px;border:1px solid #ac99bc;border-radius:6px;background-color:#d9c7e6;background-image:radial-gradient(ellipse at 10% 0%,#ffedf3a8,transparent 58%),linear-gradient(112deg,#edbed2 0%,#e6beda 36%,#d8bde7 70%,#cbb9e6 100%);color:#382843;box-shadow:inset 0 1px 0 #ffffff70;font:500 12px/1.35 "FILEO Grotesk",sans-serif;overflow-wrap:anywhere}
 .rec-tag-pref{border-color:#9982ac}
 @media(forced-colors:active){.rec-tag{background:Canvas;color:CanvasText;border-color:CanvasText;box-shadow:none}}
 .rec-disclose-label{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;color:#70527c;font:500 12px/1.4 "FILEO Grotesk",sans-serif}

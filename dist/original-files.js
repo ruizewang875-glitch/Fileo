@@ -3,7 +3,7 @@
 export const ORIGINAL_LIMITS=Object.freeze({persistentBytes:50*1024*1024});
 const memory=new Map(),persistence=new Map(),objectUrls=new Set();
 const RASTER_TYPES={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif',avif:'image/avif',bmp:'image/bmp'};
-const TEXT_EXTENSIONS=new Set(['txt','md','csv','json','log','yaml','yml','xml','js','ts','css','py']);
+const TEXT_EXTENSIONS=new Set(['txt','md','csv','json','jsonl','log','yaml','yml','xml','js','ts','css','py']);
 const UNSAFE_EXTENSIONS=new Set(['svg','svgz','html','htm','xhtml','mhtml','mht']);
 let databasePromise;
 const validId=id=>typeof id==='string'&&id.length>0&&id.length<=500;

@@ -15,8 +15,8 @@ function zip(entries){
  }
  const cd=Buffer.concat(directory),e=Buffer.alloc(22);e.writeUInt32LE(0x06054b50);e.writeUInt16LE(entries.length,8);e.writeUInt16LE(entries.length,10);e.writeUInt32LE(cd.length,12);e.writeUInt32LE(offset,16);return Buffer.concat([...local,cd,e]);
 }
-test('plain text and TXL produce a bounded excerpt of the real file; markup is escaped',async()=>{
- const art=await svg('notes.txl','<script>real note</script>\nSecond line');assert.match(art,/TEXT EXCERPT/);assert.match(art,/&lt;script&gt;real note/);assert.doesNotMatch(art,/<script>/);
+test('JSONL imports produce a bounded excerpt of the real file; markup is escaped',async()=>{
+ const art=await svg('records.jsonl','{"note":"<script>real note</script>"}\n{"note":"Second record"}');assert.match(art,/TEXT EXCERPT/);assert.match(art,/&lt;script&gt;real note/);assert.doesNotMatch(art,/<script>/);
  assert.equal(await readDocumentPreview(document('fake.txt',new Uint8Array([0,1,2,3]))),null);
 });
 test('Office extracts actual content from deflated documents, slides and worksheets',async()=>{

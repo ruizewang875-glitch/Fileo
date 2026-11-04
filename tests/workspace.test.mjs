@@ -217,3 +217,18 @@ test('trashing a matching demo original suspends its copy suggestion; restoring 
  assert.equal(lookup('file-2').bucket,'undecided');assert.ok(lookup('file-2').reasonTags.includes('Peer in Trash')||lookup('file-2').reason.includes('already in Trash'));
  ws.undo(action.id);assert.equal(lookup('file-2').bucket,'trash');assert.equal(lookup('file-2').decision,'pending');
 });
+
+test('an existing TXL demo becomes JSONL in place while its review, pins, undo and genuine local TXL survive',()=>{
+ const storage=memory(),ws=make(storage);ws.loadDemo();ws.finishAnalysis();
+ const {id}=FILES.find(f=>f.type==='jsonl');
+ const local=ws.importFiles([input('rename_rules.txl')],{project:'My files'}).ids[0];
+ ws.setProject('Studio semester');ws.toggleSaved(id);ws.touchRecent(id);
+ const event=ws.decide(id,'archive');ws.startReview([id],{focusId:id,returnTo:'#browse?type=txl&bucket=undecided'});
+ const raw=ws.getState(),old=raw.files.find(f=>f.id===id);
+ Object.assign(old,{file:'rename_rules.txl',type:'txl',ext:'.txl',kind:'sourcecode',app:'TXL',collection:'Studio tools',image:'previews/rules.svg',previewKey:'previews/rules.svg'});
+ storage.setItem('fileo-workspace-v2',JSON.stringify(raw));const again=make(storage),s=again.getState(),lookup=key=>s.files.find(f=>f.id===key),updated=lookup(id);
+ assert.equal(updated.file,'material_samples.jsonl');assert.equal(updated.ext,'.jsonl');assert.equal(updated.type,'jsonl');
+ assert.equal(updated.previewKey,FILES.find(f=>f.id===id).previewKey);assert.equal(updated.decision,'archive');assert.deepEqual(s.saved,raw.saved);assert.deepEqual(s.recent,raw.recent);
+ assert.deepEqual(s.review.ids,[id]);assert.equal(s.review.returnTo,'#browse?type=jsonl&bucket=undecided');assert.deepEqual(s.history,raw.history);assert.equal(again.canUndo(event.id),true);
+ assert.equal(lookup(local).file,'rename_rules.txl');assert.equal(lookup(local).type,'txl');assert.equal(lookup(local).source,'local');
+});

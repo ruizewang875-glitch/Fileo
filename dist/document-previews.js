@@ -17,7 +17,7 @@ export function fileCover(f={}){
  const seed=hash(name),[base,ink,accent]=palettes[hash(ext)%palettes.length];
  const size=sizeLabel(Number.isFinite(f.bytes)?f.bytes:f.file?Number(f.size)*1e6:f.size),r=178+seed%83;
  const lines=Array.from({length:9},(_,i)=>`<circle cx="702" cy="162" r="${r+i*16}" fill="none" stroke="${accent}" stroke-width="${i===4?3:1.1}"/>`).join('');
- const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="570" viewBox="0 0 800 570"><rect width="800" height="570" fill="${base}"/>${lines}<path d="M43 68h28l10 10h28v21H43z" fill="none" stroke="${ink}" stroke-width="2.4"/><text x="45" y="135" ${mono} font-size="18" letter-spacing="3" fill="${ink}">FILE COVER</text><text x="36" y="345" ${heading} font-size="${ext.length>5?105:153}" font-weight="520" letter-spacing="-7" fill="${ink}">${esc(ext)}</text><path d="M45 400H755" stroke="${ink}" stroke-opacity=".34"/><text x="45" y="454" ${heading} font-size="31" fill="${ink}">${esc(shorten(name,35))}</text><text x="46" y="501" ${mono} font-size="18" fill="${ink}">${esc(size||'Local file')}</text></svg>`;
+ const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="570" viewBox="0 0 800 570"><rect width="800" height="570" fill="${base}"/>${lines}<title>File cover for ${esc(name)}</title><text x="36" y="345" ${heading} font-size="${ext.length>5?105:153}" font-weight="520" letter-spacing="-7" fill="${ink}">${esc(ext)}</text><text x="45" y="454" ${heading} font-size="31" fill="${ink}">${esc(shorten(name,35))}</text><text x="46" y="501" ${mono} font-size="18" fill="${ink}">FILE COVER · ${esc(size||'Local file')}</text></svg>`;
  return {src:uri(svg),alt:'File cover for '+name};
 }
 function wrap(s,limit=56){
@@ -31,7 +31,7 @@ function excerpt(file,text,label){
  if(!clean(text))return null;
  const lines=wrap(text).slice(0,8);if(!lines.length)return null;
  const [base,ink,accent]=palettes[hash(extOf(file))%palettes.length];
- const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="960" height="690"><rect width="960" height="690" fill="${base}"/><rect x="42" y="34" width="876" height="622" rx="4" fill="#fdfbf8"/><rect x="82" y="74" width="9" height="23" fill="${accent}"/><text x="107" y="92" ${mono} font-size="17" letter-spacing="2" fill="${ink}">${esc(label.toUpperCase())}</text><text x="82" y="156" ${heading} font-size="33" font-weight="600" fill="${ink}">${esc(shorten(file.name,40))}</text><path d="M82 184H879" stroke="${accent}"/>${lines.map((s,i)=>`<text x="82" y="${241+i*45}" ${heading} font-size="22" fill="#413c44">${esc(s)}</text>`).join('')}</svg>`;
+ const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="960" height="690"><title>${esc(label.toUpperCase())} · ${esc(file.name)}</title><rect width="960" height="690" fill="${base}"/><rect x="42" y="34" width="876" height="622" rx="4" fill="#fdfbf8"/>${lines.map((s,i)=>`<text x="84" y="${105+i*60}" ${heading} font-size="23" fill="#413c44">${esc(s)}</text>`).join('')}</svg>`;
  return {blob:new Blob([svg],{type:'image/svg+xml'}),mime:'image/svg+xml'};
 }
 async function inflate(bytes,format,limit){
@@ -128,7 +128,7 @@ export async function readDocumentPreview(file){
  const ext=extOf(file);try{
   if(['docx','pptx','xlsx'].includes(ext))return await office(file,ext);
   if(ext==='pdf')return await pdf(file);
-  if(['txt','txl','md','csv','log','rtx'].includes(ext)||file.type==='text/plain'){
+  if(['txt','jsonl','txl','md','csv','log','rtx'].includes(ext)||file.type==='text/plain'){
    const data=await bytesOf(file,0,Math.min(24*1024,file.size)),utf16=data[0]===255&&data[1]===254?'utf-16le':data[0]===254&&data[1]===255?'utf-16be':'';
    const text=(utf16?new TextDecoder(utf16):plain).decode(data);
    if(/[\u0000\u0001\u0002\u0003]/.test(text)||text.split('\ufffd').length>4)return null;return excerpt(file,text,'Text excerpt');

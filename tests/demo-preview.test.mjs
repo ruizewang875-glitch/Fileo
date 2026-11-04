@@ -19,5 +19,5 @@ test('the model study has distinct views but the copied artwork has the same ren
  assert.equal(demoPreview({source:'local',file:'off_grid_poster.ai'}),null);
 });
 test('old and new common file extensions share the correct browse group',()=>{
- for(const [ext,id] of [['DOC','doc'],['.docx','doc'],['ppt','ppt'],['.PPTX','ppt'],['XLS','xls'],['.xlsx','xls'],['.txt','txt'],['.TXL','txl'],['.PDF','pdf'],['.png','png'],['JPEG','jpg'],['.jpg','jpg']])assert.equal(typeForExtension(ext)?.id,id,ext);
+ for(const [ext,id] of [['DOC','doc'],['.docx','doc'],['ppt','ppt'],['.PPTX','ppt'],['XLS','xls'],['.xlsx','xls'],['.txt','txt'],['.JSONL','jsonl'],['.PDF','pdf'],['.png','png'],['JPEG','jpg'],['.jpg','jpg']])assert.equal(typeForExtension(ext)?.id,id,ext);
 });

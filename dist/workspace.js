@@ -86,7 +86,7 @@ function restoreState(raw,clock) {
    if(project&&tags.length)state.projectPreferences[project]=tags;
   }
  }
- const seen=new Set();
+ const seen=new Set(),upgradedCodeIds=new Set();
  for (const f of raw.files) {
   if (!f || typeof f.id!=='string' || seen.has(f.id) || typeof f.file!=='string' || !BUCKETS.has(f.bucket) || !Number.isFinite(f.size) || f.size<0) continue;
   const record={...f,project:cleanText(f.project,300)||'Imported files',decision:DECISIONS.has(f.decision)?f.decision:'pending',clarification:safeClarification(f.clarification),revision:Number.isSafeInteger(f.revision)&&f.revision>=0?f.revision:0,source:f.source==='demo'?'demo':'local'};
@@ -99,7 +99,9 @@ function restoreState(raw,clock) {
    const sample=DEMO_FILES.get(record.id);
    if(sample){
     // Refresh authored metadata and preview references, never review or action state.
-    const project=record.project===sample.project?DEMO_PROJECT:record.project;
+    const wasDemoTXL=sample.type==='jsonl'&&record.type==='txl'&&record.file==='rename_rules.txl';
+    if(wasDemoTXL)upgradedCodeIds.add(record.id);
+    const project=record.project===sample.project||(wasDemoTXL&&record.project==='Studio tools')?DEMO_PROJECT:record.project;
     Object.assign(record,sample,{project,collection:sample.project,baseBucket:sample.bucket,baseReason:sampleReasons[sample.bucket]});
    }else Object.assign(record,recommendationBaseline(record));
    if(Object.hasOwn(LEGACY_DEMO_IMAGES,record.image))record.image=LEGACY_DEMO_IMAGES[record.image];
@@ -115,6 +117,10 @@ function restoreState(raw,clock) {
  const review=raw.review||{},reviewIds=validIds(review.ids),selectedId=Array.isArray(review.ids)?review.ids[review.cursor]:null;
  const selectedIndex=reviewIds.indexOf(selectedId),reviewCursor=selectedIndex>=0?selectedIndex:Number.isInteger(review.cursor)?Math.max(0,Math.min(reviewIds.length,review.cursor)):0;
  state.review={ids:reviewIds,cursor:reviewCursor,returnTo:returnRoute(review.returnTo),deferred:validIds(review.deferred).filter(id=>reviewIds.includes(id))};
+ if(reviewIds.some(id=>upgradedCodeIds.has(id))){
+  const [target,query='']=state.review.returnTo.split('?'),filters=new URLSearchParams(query);
+  if(filters.get('type')==='txl'){filters.set('type','jsonl');state.review.returnTo=target+'?'+filters;}
+ }
  const analysis=raw.analysis||{};
  state.analysis={status:['idle','pending','done'].includes(analysis.status)?analysis.status:'idle',step:Number.isInteger(analysis.step)?Math.max(0,Math.min(3,analysis.step)):0,ids:validIds(analysis.ids)};
  state.history=Array.isArray(raw.history)?raw.history.filter(e=>e&&typeof e.id==='string'&&typeof e.action==='string'&&Array.isArray(e.fileIds)&&e.fileIds.every(id=>seen.has(id))&&Array.isArray(e.before)&&e.before.every(b=>b&&seen.has(b.id)&&DECISIONS.has(b.decision))&&e.afterRevision&&typeof e.afterRevision==='object').map(e=>({...e,undone:e.undone===true})):[];

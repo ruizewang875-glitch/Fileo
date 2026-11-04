@@ -10,6 +10,7 @@ test('HTML and SVG cannot be opened as same-origin active documents',()=>{
 test('browser-readable formats use explicit safe MIME; native formats download',()=>{
  assert.deepEqual(originalDisposition({name:'notes.md',type:'text/htmlx'}),{kind:'view',mime:'text/plain;charset=utf-8'});
  assert.deepEqual(originalDisposition({name:'portrait.PNG',type:''}),{kind:'view',mime:'image/png'});
+ assert.deepEqual(originalDisposition({name:'records.JSONL',type:'application/x-ndjson'}),{kind:'view',mime:'text/plain;charset=utf-8'});
  assert.deepEqual(originalDisposition({name:'review.pdf'}),{kind:'view',mime:'application/pdf'});
  assert.equal(originalDisposition({name:'model.3dm',type:'image/png'}).kind,'download');
  assert.equal(originalDisposition({name:'poster.psd'}).kind,'download');

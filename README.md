@@ -57,6 +57,14 @@ Suggestions use deterministic local rules; no model API is connected. Demo evide
 
 All workspace data stays in this browser: metadata and decisions use localStorage (`fileo-workspace-v2`), while image previews and eligible originals use IndexedDB. Clearing browser data removes the workspace. Keep, Archive and Trash update the prototype catalog only: **source files are never modified or deleted from disk**. “Potential to clear” is an estimate, not a claim that physical disk space has been freed.
 
+## Privacy and AI access
+
+First-use consent appears before the workspace can prepare AI suggestions. Users can allow all types, save a selected set, or continue without AI. The account panel opens the same policy and 16 per-type switches. Closing the dialog grants nothing; old workspaces must make an explicit choice. Turning a type off refreshes all projects, removes its displayed evidence and excludes its files from AI comparisons. Manual previews, decisions, originals and reversible history remain available.
+
+Expanded recommendation details begin with a per-file reading receipt. Authorized sample files show a green **Successfully read · Demo** status and the proposed reading scope. Actual imports show **Metadata only** because the recommendation engine receives names, types, sizes and dates; local preview extraction is a separate user-facing feature. Native design formats would need compatible parsers or exports before their layers, geometry or timelines could support a real model. No AI provider receives file contents in this prototype.
+
+The policy describes original-file and thumbnail retention, how to change permissions, and the limits of preview similarity. It is an accurate prototype disclosure, not a claim of production legal compliance. A connected model would require an updated disclosure and new consent for any external transfer.
+
 ## Assets and credits
 
 The custom FILEO symbol and wordmark are reusable SVGs in `dist/assets/`. Space Grotesk is self-hosted with its SIL Open Font License in `dist/assets/fonts/`.

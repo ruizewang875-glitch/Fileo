@@ -2,7 +2,7 @@
 .ai-badge.rec-badge,.ai-badge.rec-static-badge{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;line-height:1.25}
 .ai-badge.rec-badge{width:max-content;max-width:100%;cursor:pointer;transition:box-shadow .16s,filter .16s}
 .ai-badge.rec-badge:hover,.ai-badge.rec-badge[aria-expanded=true]{filter:saturate(1.18);box-shadow:0 0 0 1px currentColor}
-.rec-badge:focus-visible,.rec-disclosure>summary:focus-visible,.rec-pop-toggle:focus-visible{outline:2px solid #855b93;outline-offset:3px}
+.rec-badge:focus-visible,.rec-disclosure>summary:focus-visible,.rec-pop-toggle:focus-visible,.rec-privacy-link:focus-visible{outline:2px solid #855b93;outline-offset:3px}
 .rec-badge .rec-info{width:13px;height:13px;flex-shrink:0;opacity:.78}
 .rec-evidence{min-width:0;color:#4b4051}
 .rec-evidence>.rec-static-badge{margin-bottom:10px}
@@ -16,7 +16,24 @@
 .rec-disclose-label{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;color:#70527c;font:500 12px/1.4 "FILEO Grotesk",sans-serif}
 .rec-disclose-label svg{width:15px;height:15px;transition:transform .16s}
 .rec-disclosure[open] .rec-disclose-label svg{transform:rotate(180deg)}
-.rec-disclosure>p,.rec-popover>p{margin:12px 0 0;color:#514954;font:400 14px/1.55 "FILEO Grotesk",sans-serif;overflow-wrap:anywhere;text-align:left}
+.rec-reason-copy{margin:13px 0 0;color:#514954;font:400 14px/1.55 "FILEO Grotesk",sans-serif;overflow-wrap:anywhere;text-align:left}
+.rec-reason-body{margin-top:13px}
+.rec-reason-body[hidden]{display:none}
+.rec-read-receipt{padding:13px 14px;border:1px solid #ded5e2;border-radius:10px;background:#f6f1f7;color:#66566f;text-align:left}
+.rec-read-receipt[data-read-status=success]{border-color:#c7dbcf;background:#eff6f1;color:#326b4b}
+.rec-read-heading{display:flex;align-items:center;gap:7px;min-width:0;font:500 13px/1.4 "FILEO Grotesk",sans-serif}
+.rec-read-heading strong{font:inherit}
+.rec-read-check{display:grid;place-items:center;width:19px;height:19px;flex:none;border-radius:50%;background:#d8ebdd;color:#286140}
+.rec-read-check svg{width:14px;height:14px}
+.rec-read-demo{margin-left:auto;padding:2px 6px;border:1px solid currentColor;border-radius:5px;flex:none;font-size:11px;line-height:1.25;opacity:.8}
+.rec-read-file{display:block;margin:7px 0 0;font:500 12px/1.45 "FILEO Grotesk",sans-serif;overflow-wrap:anywhere;color:#665c6d}
+.rec-read-items{margin:7px 0 0;padding:0;list-style:none;font:400 13px/1.45 "FILEO Grotesk",sans-serif;color:#514954}
+.rec-read-items li+li{margin-top:3px}
+.rec-read-items li{position:relative;padding-left:11px;overflow-wrap:anywhere}
+.rec-read-items li:before{position:absolute;left:0;top:.6em;width:3px;height:3px;border-radius:50%;content:"";background:currentColor;opacity:.6}
+.rec-privacy-link{display:inline-flex;align-items:center;gap:5px;margin:10px 0 0;padding:3px 0;background:transparent;border:0;border-radius:2px;color:#70527c;font:500 12px/1.4 "FILEO Grotesk",sans-serif;cursor:pointer}
+.rec-privacy-link:hover{text-decoration:underline;text-underline-offset:3px}
+.rec-privacy-link svg{width:13px;height:13px;transform:rotate(-90deg)}
 .rec-popover{--rec-tip:24px;position:fixed;inset:auto;margin:0;box-sizing:border-box;width:max-content;max-width:min(352px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow-y:auto;overscroll-behavior:contain;padding:11px 12px;border:1px solid #d7cbdc;border-radius:14px;background:#fcfbfa;color:#44354e;z-index:1800;box-shadow:0 12px 40px #34263e24,0 2px 5px #34263e0c;text-align:left}
 .rec-pop-summary{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .rec-pop-toggle{display:grid;place-items:center;flex:none;width:32px;height:32px;min-height:0;padding:0;border:1px solid #d9cadd;border-radius:50%;background:#f3edf5;color:#694d76;cursor:pointer}
@@ -24,9 +41,9 @@
 .rec-pop-toggle svg{width:16px;height:16px;transition:transform .16s}
 .rec-pop-toggle[aria-expanded="true"] svg{transform:rotate(180deg)}
 .rec-popover.is-expanded{width:min(352px,calc(100vw - 24px))}
-.rec-popover>p[hidden]{display:none}
 .rec-popover:before{content:"";position:absolute;top:0;left:calc(var(--rec-tip) - 11px);width:22px;height:2px;background:#9d7fa8;border-radius:0 0 3px 3px}
 .rec-popover[data-above=true]:before{top:auto;bottom:0;border-radius:3px 3px 0 0}
-.rec-popover>p{margin:11px 0 2px;padding-top:10px;border-top:1px solid #e4dae7}
+.rec-popover .rec-reason-copy{margin:12px 0 2px}
+@media(forced-colors:active){.rec-read-receipt,.rec-read-receipt[data-read-status=success]{border-color:CanvasText;background:Canvas;color:CanvasText}.rec-read-check{background:Highlight;color:HighlightText}.rec-read-file,.rec-read-items,.rec-privacy-link{color:CanvasText}}
 @media(prefers-reduced-motion:reduce){.rec-disclose-label svg,.rec-pop-toggle svg,.ai-badge.rec-badge{transition:none}}
 @media(max-width:600px){.rec-badge .rec-info{width:11px;height:11px}.rec-tag,.rec-disclose-label{font-size:11px}.rec-popover{padding:10px}}

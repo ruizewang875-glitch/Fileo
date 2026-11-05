@@ -1,5 +1,6 @@
 import {FILES, typeForExtension} from './data.js';
 import {assessRecommendation, PREFERENCE_PRESETS} from './recommendation.js';
+import {PRIVACY_VERSION,freshPrivacy,normalizePrivacy,isReadingAllowed} from './privacy.js';
 
 // The prototype stores a catalog, never modifies source files on disk.
 const KEY = 'fileo-workspace-v2';
@@ -31,7 +32,7 @@ export function normalizePreferenceTags(values) {
 const validEmail = value => typeof value === 'string' && value.trim().length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) ? value.trim().toLowerCase() : '';
 const returnRoute = value => typeof value === 'string' && value.length <= 2048 && /^#(?:files|projects|dashboard|activity|quick|explore|browse)?(?:\?[^<>]*)?$/.test(value) ? value : '#files';
 const freshReview = () => ({ids:[],cursor:0,returnTo:'#files',deferred:[]});
-const fresh = () => ({version:2, session:{signedIn:false,name:'Designer',email:'',provider:'demo',authMode:'prototype',sort:'modified',autoplay:true,mode:'quick',project:''},projectPreferences:Object.create(null),files:[],history:[],analysis:{status:'idle',step:0,ids:[]},review:freshReview(),resumeId:null,saved:[],recent:[],storageError:false});
+const fresh = () => ({version:2, session:{signedIn:false,name:'Designer',email:'',provider:'demo',authMode:'prototype',sort:'modified',autoplay:true,mode:'quick',project:''},privacy:freshPrivacy(),projectPreferences:Object.create(null),files:[],history:[],analysis:{status:'idle',step:0,ids:[]},review:freshReview(),resumeId:null,saved:[],recent:[],storageError:false});
 const snapshot = file => ({id:file.id,decision:file.decision,clarification:clone(file.clarification),revision:file.revision});
 const sameResult = (a,b) => !!a&&!!b&&a.decision===b.decision&&JSON.stringify(a.clarification??null)===JSON.stringify(b.clarification??null);
 const sampleReasons = {
@@ -71,13 +72,21 @@ function refreshRecommendations(state,clock,projects=null){
  }
  for(const [project,files] of groups){
   const tags=state.projectPreferences[project]||[];
-  const results=files.map(file=>assessRecommendation(file,{files,tags,now:clock}));
-  files.forEach((file,i)=>{const result=results[i];file.bucket=result.bucket;file.reason=result.reason;file.reasonTags=[...result.tags];});
+  const results=files.map(file=>{
+   // File metadata remains available for browsing, but AI rules run only with consent.
+   if(file.source==='local'&&isReadingAllowed(file,state.privacy)){
+    const baseline=metadataRecommendation({name:file.file,lastModified:file.lastModified},clock);
+    file.baseBucket=baseline.bucket;file.baseReason=baseline.reason;
+   }
+   return assessRecommendation(file,{files,tags,now:clock,privacy:state.privacy});
+  });
+  files.forEach((file,i)=>{const result=results[i];file.bucket=result.bucket;file.reason=result.reason;file.reasonTags=[...result.tags];file.readAccess=result.readAccess;});
  }
 }
 function restoreState(raw,clock) {
  const state=fresh();
  if (!raw || raw.version!==2 || !Array.isArray(raw.files)) return state;
+ state.privacy=normalizePrivacy(raw.privacy);
  const session=raw.session||{};
  state.session={signedIn:session.signedIn===true,name:cleanText(session.name,40)||'Designer',email:validEmail(session.email),provider:PROVIDERS.has(session.provider)?session.provider:'demo',authMode:'prototype',sort:SORTS.has(session.sort)?session.sort:'modified',autoplay:session.autoplay!==false,mode:MODES.has(session.mode)?session.mode:'quick',project:cleanText(session.project,300)};
  if(raw.projectPreferences&&typeof raw.projectPreferences==='object'&&!Array.isArray(raw.projectPreferences)){
@@ -189,6 +198,12 @@ export function createWorkspace(options={}) {
  }
  return {
   getState,
+  getPrivacy(){return clone(state.privacy);},
+  setPrivacy(types){
+   if(!types||typeof types!=='object'||Array.isArray(types))return clone(state.privacy);
+   state.privacy=normalizePrivacy({acceptedVersion:PRIVACY_VERSION,acceptedAt:timestamp(),types});
+   refreshRecommendations(state,timestamp());persist();return clone(state.privacy);
+  },
   subscribe(fn){if(typeof fn!=='function')return ()=>{};listeners.add(fn);return ()=>listeners.delete(fn);},
   login(identity){
    if(typeof identity==='string'){
@@ -258,7 +273,7 @@ export function createWorkspace(options={}) {
      }
      continue;
     }
-    const extension=name.includes('.')?name.slice(name.lastIndexOf('.')).toLowerCase():'',type=typeForExtension(extension),clock=timestamp(),recommendation=metadataRecommendation({name,lastModified:modified},clock);
+    const extension=name.includes('.')?name.slice(name.lastIndexOf('.')).toLowerCase():'',type=typeForExtension(extension),clock=timestamp(),recommendation=isReadingAllowed({file:name,ext:extension,type:type?.id},state.privacy)?metadataRecommendation({name,lastModified:modified},clock):{bucket:'undecided',reason:'',duplicate:''};
     const imageMime=/^image\//.test(raw.type||'')||/\.(?:jpe?g|png|webp|gif|avif|bmp|svg|tiff?|heic|heif)$/i.test(name);
     const record={id:uid('local'),file:name,name:name.replace(/\.[^.]+$/,'').replaceAll('_',' '),ext:extension||'file',type:type?.id||extension.slice(1)||'other',kind:type?.kind||'generic',app:type?.app||(imageMime?'Image':extension==='.pdf'?'PDF document':'File'),category:type?.category||(imageMime?'Images':'Documents'),tags:`${extension.slice(1)} ${imageMime?'image photo picture':''}`,project,modified:new Date(modified||clock).toISOString().slice(0,10),lastModified:modified,size:bytes/1000000,bytes,status:'work',forgotten:modified>0&&clock-modified>180*DAY,...recommendation,baseBucket:recommendation.bucket,baseReason:recommendation.reason,decision:'pending',clarification:null,revision:0,source:'local',path,fingerprint,importedAt:clock};
     Object.assign(record,previewFields(raw));

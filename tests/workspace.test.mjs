@@ -2,9 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createWorkspace,normalizePreferenceTags} from '../dist/workspace.js';
 import {FILES,typeForExtension} from '../dist/data.js';
+import {allTypePermissions} from '../dist/privacy.js';
 const NOW=Date.parse('2026-10-21T12:00:00Z');
 const memory=()=>{const m=new Map();return {getItem:k=>m.get(k)||null,setItem:(k,v)=>m.set(k,v),map:m};};
-const make=(storage=memory())=>createWorkspace({storage,now:()=>NOW});
+// Existing behavior tests exercise an explicitly opted-in workspace.
+const make=(storage=memory())=>{const ws=createWorkspace({storage,now:()=>NOW});ws.setPrivacy(allTypePermissions(true));return ws;};
 const input=(name,extra={})=>({name,size:1200000,lastModified:NOW-86400000,type:'application/octet-stream',...extra});
 
 test('fresh workspace starts signed out with no fabricated files',()=>{

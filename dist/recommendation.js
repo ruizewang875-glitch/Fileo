@@ -1,3 +1,4 @@
+import {readAccessFor,isReadingAllowed} from './privacy.js';
 // A transparent local policy for the prototype. The demo catalog supplies authored evidence
 // about its artwork; real imports are assessed only from filename, type, date and size.
 export const PREFERENCE_PRESETS = Object.freeze([
@@ -74,8 +75,12 @@ function matchGoal(tags,f,c,base){
  if(free&&base==='undecided'&&f.size>=25&&c.age!==null&&c.age>=180)return {tag:free,outcome:'archive',explanation:'this '+sizeLabel(f.size)+' file was last edited on '+c.day+'; move it out of the active set while retaining it'};
  return null;
 }
-export function assessRecommendation(file,{files=[],tags=[],now=Date.now()}={}){
- const f=file||{},base=validBuckets.has(f.baseBucket)?f.baseBucket:validBuckets.has(f.bucket)?f.bucket:'undecided';
+export function assessRecommendation(file,{files=[],tags=[],now=Date.now(),privacy}={}){
+ const f=file||{};
+ const readAccess=privacy===undefined?null:readAccessFor(f,privacy);
+ if(readAccess&&['pending','disabled'].includes(readAccess.status))return {bucket:'undecided',reason:readAccess.status==='pending'?'Choose which file types AI may read in Privacy & AI access. You can still review this file yourself.':'AI reading is off for this file type. No AI recommendation is generated. You can review and organize the file yourself, or change its permission in Privacy & AI access.',tags:[readAccess.label],readAccess};
+ if(privacy!==undefined)files=(Array.isArray(files)?files:[]).filter(peer=>isReadingAllowed(peer,privacy));
+ const base=validBuckets.has(f.baseBucket)?f.baseBucket:validBuckets.has(f.bucket)?f.bucket:'undecided';
  const c=contextOf(f,Array.isArray(files)?files:[],now),evidence=[],lines=[];
  let bucket=base;
  const add=(tag,sentence)=>{if(tag&&!evidence.includes(tag))evidence.push(tag);if(sentence)lines.push(sentence);};
@@ -108,5 +113,5 @@ export function assessRecommendation(file,{files=[],tags=[],now=Date.now()}={}){
  lines.push(baseAfter[bucket]);
  if(!evidence.length)evidence.push(c.demo?'Sample metadata':'File metadata');
  const visible=goal?[...evidence.slice(0,2),'Preference: '+goal.tag]:evidence.slice(0,3);
- return {bucket,reason:lines.join(' '),tags:visible};
+ return {bucket,reason:lines.join(' '),tags:visible,...(readAccess?{readAccess}:{})};
 }

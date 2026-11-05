@@ -77,7 +77,7 @@ export function createQuickMode({root,getFiles,getState,thumb,badge,fileArt,hydr
   $('.qc-selection-size').textContent=formatStorage(chosen.reduce((n,f)=>n+f.size,0));
  }
  function renderRows(){
-  const all=files(),shown=visible(),ranks=new Map(all.filter(f=>f.decision==='pending').slice(0,3).map((f,i)=>[f.id,i+1]));
+  const all=files(),shown=visible(),ranks=new Map(all.filter(f=>f.decision==='pending'&&!['pending','disabled'].includes(f.readAccess?.status)).slice(0,3).map((f,i)=>[f.id,i+1]));
   $('.qc-list-count').textContent=`${shown.length} ${shown.length===1?'file':'files'}`;
   $('.qc-filter-clear').hidden=!bucket&&!query;
   $('.qc-list-body').innerHTML=shown.length?shown.map(f=>{

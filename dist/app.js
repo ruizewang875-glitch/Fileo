@@ -4,6 +4,8 @@ import {demoPreview} from './demo-preview.js';
 import {fileCover} from './document-previews.js';
 import {installSuggestionPopovers,recommendationDetails,suggestionBadge} from './recommendation-ui.js';
 import {createProjectPreferencesUI} from './project-preferences-ui.js';
+import {createPrivacyUI} from './privacy-ui.js';
+import {PRIVACY_VERSION, PRIVACY_TYPES, isReadingAllowed} from './privacy.js';
 import {createCarousel} from './carousel.js';
 import {createQuickMode} from './quick-mode.js';
 import {createExploreMode} from './explore-mode.js';
@@ -27,7 +29,26 @@ const modeHome=()=>({page:state().session.mode==='explore'?'explore':'quick'});
 const pending=()=>currentFiles().filter(f=>f.decision==='pending');
 const previewUrls=new Map();
 const prefUI=createProjectPreferencesUI({getTags:p=>ws.getProjectPreferences(p),setTags:(p,tags)=>ws.setProjectPreferences(p,tags),onSaved:()=>refreshCurrent()});
-installSuggestionPopovers({getFile:id=>currentFiles().find(f=>f.id===id)});
+const suggestionPopovers=installSuggestionPopovers({getFile:id=>currentFiles().find(f=>f.id===id)});
+const privacyUI=createPrivacyUI({
+ getPrivacy:()=>ws.getPrivacy(),
+ setPrivacy:types=>ws.setPrivacy(types),
+ onSaved:()=>{
+  suggestionPopovers.close();
+  quickUI.clearSelection();exploreUI.clearSelection();
+  refreshCurrent();syncPrivacyEntry();
+  if($('#preview-dialog').open)updatePreview();
+ }
+});
+function syncPrivacyEntry(){
+ const p=ws.getPrivacy(),count=PRIVACY_TYPES.filter(t=>p.types[t.id]).length;
+ $('#privacy-account-summary').textContent=p.acceptedVersion===PRIVACY_VERSION?count+' of '+PRIVACY_TYPES.length+' file types enabled':'Choose what AI can read';
+}
+document.addEventListener('click',e=>{
+ const target=e.target.closest('[data-privacy-open]');
+ if(!target)return;e.preventDefault();e.stopPropagation();suggestionPopovers.close();
+ privacyUI.open({mode:state().session.signedIn?'settings':'policy'});
+});
 $('#import-demo').textContent=`Use ${FILES.length} demo files →`;
 let importBusy=false,originalRepairId=null,repairId=null,authEmail='',authIntent={page:'import'},lastPage='',routeGeneration=0,renderedHash=null;
 let route={},sort=state().session.sort,previewId=null,reviewId=state().resumeId,queue=[],loginNext='import',analysisTimer=null,analysisPaused=false,toastEvent=null,toastTimer=null,confirmFn=null,clarifyId=null,clarifyChoice=null;
@@ -51,13 +72,22 @@ function openLogin(next={page:'import'}){
  $('#login-email').value=state().session.email||'';$('#login-code').value='';
  $('#login-dialog').showModal();
 }
-function completeLogin(identity){
+let completingLogin=false;
+async function completeLogin(identity){
+ if(completingLogin)return;
+ completingLogin=true;
+ try{
+ if(ws.getPrivacy().acceptedVersion!==PRIVACY_VERSION){
+  const consent=await privacyUI.open({mode:'onboarding'});
+  if(!consent||!$('#login-dialog').open)return;
+ }
  if(!ws.login(identity)){showAuthStep('auth-options');$('#auth-error').textContent='Enter a valid email address.';$('#auth-error').hidden=false;$('#login-email').focus();return;}
  $('#login-dialog').close();sort=state().session.sort;carousel.setAutoplay(state().session.autoplay);
  const intent=authIntent;
  if(intent.page==='demo'){loadDemo();return;}
  if(!records().length){navigate({page:'import'},{replace:route.page==='home'});return;}
  navigate(intent.page==='import'&&intent.resume?{page:'home'}:intent);
+ }finally{completingLogin=false;}
 }
 $('#login-form').addEventListener('submit',e=>{
  e.preventDefault();authEmail=$('#login-email').value.trim().toLowerCase();
@@ -228,7 +258,11 @@ async function loadDemo(){
 $('#import-demo').onclick=loadDemo;
 function startAnalysis(){
  const s=state(),generation=routeGeneration;if(s.analysis.status!=='pending')return;
- const names=['Reading files','Finding signals','Preparing suggestions'];$('#analysis-count').textContent=`${s.analysis.ids.length} ${s.analysis.ids.length===1?'file':'files'}`;
+ const allowed=s.files.some(f=>s.analysis.ids.includes(f.id)&&isReadingAllowed(f,s.privacy));
+ const names=allowed?['Checking permitted files','Finding signals','Preparing suggestions']:['Listing files','Preparing your workspace','Ready for your review'];
+ $('#analysis-title').textContent=allowed?'Preparing suggestions':'Preparing files';
+ $('#analysis-view .local-note').textContent=allowed?'AI suggestions use only file types you allowed.':'AI reading is off. Your files are available for manual review.';
+ $('#analysis-count').textContent=`${s.analysis.ids.length} ${s.analysis.ids.length===1?'file':'files'}`;
  $('#analysis-progress').value=s.analysis.step;$('#analysis-steps').innerHTML=names.map((n,i)=>`<div class="analysis-step ${i<s.analysis.step?'done':i===s.analysis.step?'active':''}"><span>${i<s.analysis.step?'✓':String(i+1).padStart(2,'0')}</span>${n}</div>`).join('');
  analysisTimer=setTimeout(()=>{if(analysisPaused||route.page!=='analysis'||generation!==routeGeneration||!state().session.signedIn)return;
   if(state().analysis.step>=3){ws.finishAnalysis();navigate(modeHome(),{replace:true});}
@@ -300,8 +334,16 @@ async function openSourceFile(id){const f=records().find(f=>f.id===id);if(!f)ret
 const quickUI=createQuickMode({root:$('#quick-view'),getFiles:currentFiles,getState:state,thumb,badge,fileArt,hydrateArt,prettySize,escapeHtml:esc,onDecide:batchDecision});
 const exploreUI=createExploreMode({root:$('#browse-view'),getFiles:currentFiles,getState:state,thumb,badge,fileArt,hydrateArt,prettySize,escapeHtml:esc,onDecide:batchDecision,onReview:(ids,focus,filters)=>beginReview(ids,focus,hash({...route,...filters})),onOpenFile:openSourceFile,onBack:()=>navigate({page:'explore'}),onSave:id=>{ws.toggleSaved(id);refreshCurrent();}});
 $('#toast-undo').onclick=()=>undo(toastEvent);$('#toast-close').onclick=()=>$('#toast').hidden=true;
-$('#account-button').onclick=()=>{if(!state().session.signedIn)return openLogin({page:'home'});const p=state().session;$('#account-name').textContent=p.name;$('#account-email').textContent=p.email||'Prototype workspace';$('#account-avatar').textContent=$('#header-avatar').textContent;$('#display-name').value=p.name;$('#account-sort').value=p.sort;$('#account-autoplay').checked=p.autoplay;$('#account-save-status').textContent='';prefUI.syncAccount(p.project);$('#account-panel').showModal();};$('#account-close').onclick=()=>$('#account-panel').close();$('#account-form').onsubmit=e=>{e.preventDefault();const name=$('#display-name').value.trim();if(!name)return;ws.updateProfile({name,sort:$('#account-sort').value,autoplay:$('#account-autoplay').checked});sort=state().session.sort;carousel.setAutoplay(state().session.autoplay);$('#account-name').textContent=name;$('#account-save-status').textContent='Saved';refreshCurrent();};$('#logout-button').onclick=()=>{closeDialogs();ws.logout();navigate({page:'home'});$('#toast').hidden=true;};
+$('#account-button').onclick=()=>{if(!state().session.signedIn)return openLogin({page:'home'});const p=state().session;$('#account-name').textContent=p.name;$('#account-email').textContent=p.email||'Prototype workspace';$('#account-avatar').textContent=$('#header-avatar').textContent;$('#display-name').value=p.name;$('#account-sort').value=p.sort;$('#account-autoplay').checked=p.autoplay;$('#account-save-status').textContent='';prefUI.syncAccount(p.project);syncPrivacyEntry();$('#account-panel').showModal();};$('#account-close').onclick=()=>$('#account-panel').close();$('#account-form').onsubmit=e=>{e.preventDefault();const name=$('#display-name').value.trim();if(!name)return;ws.updateProfile({name,sort:$('#account-sort').value,autoplay:$('#account-autoplay').checked});sort=state().session.sort;carousel.setAutoplay(state().session.autoplay);$('#account-name').textContent=name;$('#account-save-status').textContent='Saved';refreshCurrent();};$('#logout-button').onclick=()=>{closeDialogs();ws.logout();navigate({page:'home'});$('#toast').hidden=true;};
 $('#assistant-button').onclick=()=>{if(!guard(modeHome()))return;$('#assistant-panel').showModal();};$('#assistant-close').onclick=()=>$('#assistant-panel').close();$('#assistant-form').onsubmit=e=>{e.preventDefault();navigate({page:'browse',q:$('#assistant-query').value.trim()});};$$('[data-assistant-query]').forEach(b=>b.onclick=()=>navigate({page:'browse',q:b.dataset.assistantQuery}));$$('[data-assistant-view]').forEach(b=>b.onclick=()=>navigate({page:'browse',view:b.dataset.assistantView}));
 $$('[data-close]').forEach(b=>b.onclick=()=>$('#'+b.dataset.close).close());for(const d of $$('dialog'))d.addEventListener('click',e=>{if(e.target!==d)return;const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();});document.addEventListener('keydown',e=>{if(!['import','analysis','review'].includes(route.page)&&(e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'&&state().session.signedIn&&records().length){e.preventDefault();closeDialogs();navigate({});setTimeout(()=>$('#browse-view input[type=search]')?.focus(),0);}});
 document.addEventListener('keydown',e=>{if(route.page!=='review'||$('dialog[open]')||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;if(e.key==='ArrowLeft'&&!$('#review-prev').disabled){e.preventDefault();nextReview(-1);}if(e.key==='ArrowRight'&&!$('#review-next').disabled){e.preventDefault();nextReview(1);}});
-syncHeader();renderRoute();
+syncHeader();renderRoute();syncPrivacyEntry();
+// Older browser workspaces need an explicit choice; previous use is not consent.
+if(state().session.signedIn&&ws.getPrivacy().acceptedVersion!==PRIVACY_VERSION){
+ analysisPaused=true;clearTimeout(analysisTimer);
+ privacyUI.open({mode:'onboarding'}).then(confirmed=>{
+  if(!confirmed){ws.logout();navigate({page:'home'});return;}
+  renderRoute();
+ });
+}

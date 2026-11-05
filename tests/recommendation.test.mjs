@@ -35,5 +35,20 @@ test('preferring space can archive older large uncertain files but size cannot j
 test('recommendation markup escapes untrusted filenames, tags and rationale and hides detail by default',()=>{
  const f={...file,id:'x" autofocus="y',file:'a <b>',reasonTags:['<script>x</script>'],reason:'<style>input{}</style>'};
  const button=suggestionBadge(f,{interactive:true});assert.match(button,/aria-expanded="false"/);assert.doesNotMatch(button,/ autofocus="/);assert.match(button,/&lt;b&gt;/);
- const html=recommendationDetails(f);assert.doesNotMatch(html,/<script>|<style>|<details[^>]* open/);assert.match(html,/<summary>[\s\S]*&lt;script&gt;/);assert.match(html,/<\/summary><p>&lt;style&gt;/);
+ const html=recommendationDetails(f);assert.doesNotMatch(html,/<script>|<style>|<details[^>]* open/);assert.match(html,/<summary>[\s\S]*&lt;script&gt;/);assert.match(html,/<\/summary><div class="rec-reason-body">/);assert.match(html,/<p class="rec-reason-copy">&lt;style&gt;/);
+});
+test('permission-aware receipt comes before the rationale and names the sample source and read scope',()=>{
+ const html=recommendationDetails({...file,reason:'Review this copy.',readAccess:{status:'success',label:'Successfully read',demo:true,items:['Exported model preview','Filename, size and date']}});
+ assert.match(html,/data-read-status="success"/);assert.match(html,/Successfully read/);assert.match(html,/>Demo<\/span>/);assert.match(html,/lounge_copy\.3dm/);assert.match(html,/<li>Exported model preview<\/li>/);
+ assert.ok(html.indexOf('rec-read-receipt')<html.indexOf('rec-reason-copy'));
+ assert.match(html,/data-privacy-open/);
+});
+test('real uploads and disabled access never get a successful-read check, and scopes are escaped',()=>{
+ for(const status of ['pending','disabled','limited']){
+  const html=recommendationDetails({...file,source:'local',readAccess:{status,label:status==='limited'?'Metadata only':'Reading off',demo:false,items:['<script>bad</script>']}});
+  assert.doesNotMatch(html,/Successfully read|rec-read-check|>Demo<\/span>|<script>/);
+  if(status==='limited')assert.match(html,/&lt;script&gt;bad&lt;\/script&gt;/);
+  else assert.doesNotMatch(html,/&lt;script&gt;bad/);
+ }
+ assert.doesNotMatch(recommendationDetails(file),/Successfully read|rec-read-check/);
 });

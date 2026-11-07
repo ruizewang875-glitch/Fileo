@@ -1,125 +1,111 @@
 import {formatStorage} from './data.js';
 
-const NS='http://www.w3.org/2000/svg',TAU=Math.PI*2,CX=500,CY=286,OUTER=192,INNER=139;
-const ids=['keep','archive','trash','undecided'];
-const fallback=[-.25,1.65,3.1,4.33];
-const colors={keep:['#6b9e91','#b6d9c9'],archive:['#9a7cba','#cfbae5'],trash:['#bc718e','#eeb2bc'],undecided:['#7f8daf','#b9c7df']};
+const NS='http://www.w3.org/2000/svg',TAU=Math.PI*2,CX=500,CY=288,R=214,W=72;
+const colors={keep:['#7bab9d','#b6d9c9'],archive:['#a184bf','#d2bde6'],trash:['#c67c97','#efb2bf'],undecided:['#8797b9','#c2cee3']};
 const safe=n=>Number.isFinite(n)&&n>0?n:0;
-const point=(r,a)=>[CX+r*Math.cos(a),CY+r*Math.sin(a)];
-function segment(start,end){
- const span=end-start;if(span<=0)return '';
- const gap=Math.min(.0279,span/5),a=start+gap/2,b=end-gap/2,p=point(OUTER,a),q=point(OUTER,b),r=point(INNER,b),s=point(INNER,a),large=b-a>Math.PI?1:0;
- return `M${p} A${OUTER} ${OUTER} 0 ${large} 1 ${q} L${r} A${INNER} ${INNER} 0 ${large} 0 ${s} Z`;
+const muted=color=>'#'+[1,3,5].map((offset,i)=>Math.round(parseInt(color.slice(offset,offset+2),16)*.24+[249,247,250][i]*.76).toString(16).padStart(2,'0')).join('');
+const point=(radius,angle)=>[CX+radius*Math.cos(angle),CY+radius*Math.sin(angle)];
+const p=xy=>xy.map(n=>Number(n.toFixed(4))).join(' ');
+function arc(radius,start,end,sweep=1){
+ const span=Math.abs(end-start),a=point(radius,start),b=point(radius,end);
+ if(span>=TAU-.000001){const mid=point(radius,start+(sweep?1:-1)*Math.PI);return `M${p(a)} A${radius} ${radius} 0 1 ${sweep} ${p(mid)} A${radius} ${radius} 0 1 ${sweep} ${p(b)}`;}
+ return `M${p(a)} A${radius} ${radius} 0 ${span>Math.PI?1:0} ${sweep} ${p(b)}`;
+}
+function body(start,end){
+ if(end<=start)return '';
+ return `${arc(R+W/2,start,end)} L${p(point(R-W/2,end))} ${arc(R-W/2,end,start,0).replace(/^M[^A]+/,'')} Z`;
 }
 
-// The visual positions follow sector midpoints, with circular separation so tiny
-// categories remain distinct and clickable even beside one dominant segment.
-export function buildBubbleLayout(groups=[]){
- const values=Array.isArray(groups)?groups:[],total=values.reduce((n,g)=>n+safe(g.share),0);
+// Data angles stay proportional. Rounded heads are a visual overlap, never a
+// minimum-sized replacement for a tiny category. Short labels get a fallback.
+export function buildRibbonLayout(groups=[]){
+ const list=Array.isArray(groups)?groups:[],max=Math.max(0,...list.map(g=>safe(g.share)));
+ const total=list.reduce((sum,g)=>sum+(max?safe(g.share)/max:0),0);
  let angle=-Math.PI/2;
- const list=values.map((g,i)=>{const share=total?safe(g.share)/total:0,start=angle,end=start+share*TAU;angle=end;const mid=share?(start+end)/2:fallback[ids.indexOf(g.id)]??i*TAU/Math.max(1,values.length);return {...g,share,start,end,angle:mid,orbit:((mid%TAU)+TAU)%TAU,radius:70,path:segment(start,end)};});
- const ordered=[...list].sort((a,b)=>a.orbit-b.orbit),gap=Math.min(1.08,TAU/Math.max(1,ordered.length));
- if(ordered.length>1)for(let pass=0;pass<80;pass++)for(let i=0;i<ordered.length;i++){
-  const a=ordered[i],b=ordered[(i+1)%ordered.length],distance=b.orbit+(i===ordered.length-1?TAU:0)-a.orbit;
-  if(distance<gap){const push=(gap-distance)/2;a.orbit-=push;b.orbit+=push;}
- }
- return list.map(g=>{const [anchorX,anchorY]=point((OUTER+INNER)/2,g.angle);return {...g,x:CX+320*Math.cos(g.orbit),y:CY+215*Math.sin(g.orbit),anchorX,anchorY};});
+ return list.map(g=>{
+  const share=total?(safe(g.share)/max)/total:0,start=angle,end=start+share*TAU,span=end-start;angle=end;
+  const reverse=Math.sin(end)>0,head=point(R,end),outer=point(R+W/2,end),inner=point(R-W/2,end);
+  const hasCap=span>=.4&&span<TAU-.000001;
+  const headEdgePath=hasCap?`M${p(outer)} A${W/2} ${W/2} 0 0 1 ${p(inner)}`:'';
+  const headPath=headEdgePath?headEdgePath+' Z':'';
+  const labelStart=start+.18,labelEnd=end-.10,available=Math.max(0,(labelEnd-labelStart)*R);
+  const fontSize=Math.min(25,available/Math.max(1,String(g.label||g.id||'').length*.56));
+  const labelFits=share>0&&fontSize>=16;
+  const labelRadius=R+(reverse?8:-8);
+  const labelPath=labelFits?arc(labelRadius,reverse?labelEnd:labelStart,reverse?labelStart:labelEnd,reverse?0:1):'';
+  return {...g,share,start,end,reverse,bodyPath:body(start,end),headPath,headEdgePath,headX:head[0],headY:head[1],headRadius:hasCap?W/2:0,arrowRotation:end*180/Math.PI+90+(reverse?45:-45),labelPath,labelFits,fontSize};
+ });
 }
 
 let serial=0;
-export function createBubbleRing({root,onSelect=()=>{}}){
- const uid='fileo-orbit-'+(++serial),mq=matchMedia('(prefers-reduced-motion: reduce)');
- let state={groups:[],selected:'',metric:'space',phase:'ready',totalCount:0,totalSize:0},nodes=new Map(),frame=0,last=0,destroyed=false,visible=true,paused=false,clock=0,hovered='',suppressFocusTip=false;
- root.classList.add('br-root');
- root.innerHTML=`<div class="br-stage"><svg class="br-svg" viewBox="0 0 1000 590" aria-label="AI suggestion categories"><defs><filter id="${uid}-mist" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="12"/></filter><filter id="${uid}-join" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur in="SourceGraphic" stdDeviation="7" result="blur"/><feColorMatrix in="blur" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 9 -3"/><feGaussianBlur stdDeviation="2"/></filter><radialGradient id="${uid}-center"><stop stop-color="#faf7fc"/><stop offset="1" stop-color="#eae3f1" stop-opacity=".28"/></radialGradient></defs><circle class="br-center-wash" cx="500" cy="286" r="143" fill="url(#${uid}-center)"/><g class="br-connections" aria-hidden="true"></g><circle class="br-track" cx="500" cy="286" r="165.5" fill="none" stroke="#e8e2ec" stroke-width="53"/><g class="br-segments"></g><circle class="br-scanner" cx="500" cy="286" r="165.5" fill="none" stroke="#b5a2c5" stroke-width="53" stroke-linecap="round" stroke-dasharray="132 908" aria-hidden="true"/></svg><div class="br-center"><span class="br-center-label"></span><strong class="br-center-value"></strong><span class="br-center-detail"></span><button class="br-reset" type="button" hidden>Show all ↗</button></div><div class="br-bubbles" role="group" aria-label="Filter by AI suggestion"></div><div class="br-tooltip" role="tooltip" hidden><strong></strong><span></span></div></div><button class="br-motion" type="button" aria-pressed="false" aria-label="Pause bubble motion"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 4v8M11 4v8"/></svg><span>Pause motion</span></button>`;
- const $=s=>root.querySelector(s),stage=$('.br-stage'),svg=$('.br-svg'),defs=svg.querySelector('defs'),connections=$('.br-connections'),segments=$('.br-segments'),bubbles=$('.br-bubbles'),tip=$('.br-tooltip');
+export function createRibbonRing({root,onSelect=()=>{}}){
+ const uid='fileo-ribbon-'+(++serial);
+ let state={groups:[],selected:'',metric:'space',phase:'ready',totalCount:0,totalSize:0},destroyed=false;
+ const nodes=new Map();root.classList.add('br-root');
+ root.innerHTML=`<div class="br-stage"><svg class="br-svg" viewBox="0 0 1000 580" role="group" aria-label="Filter files by AI suggestion"><defs><radialGradient id="${uid}-center"><stop stop-color="#faf8fc"/><stop offset="1" stop-color="#eae3f1" stop-opacity=".25"/></radialGradient><filter id="${uid}-shadow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3"/></filter></defs><circle cx="500" cy="288" r="178" fill="url(#${uid}-center)"/><circle class="br-track" cx="500" cy="288" r="214" fill="none" stroke="#eae5ed" stroke-width="72"/><g class="br-art"><g class="br-bodies"></g><g class="br-heads" aria-hidden="true"></g><g class="br-labels" aria-hidden="true"></g></g><circle class="br-scanner" cx="500" cy="288" r="214" fill="none" stroke="#b5a2c5" stroke-width="72" stroke-linecap="round" stroke-dasharray="180 1165" aria-hidden="true"/></svg><div class="br-center"><span class="br-center-label"></span><strong class="br-center-value"></strong><span class="br-center-detail"></span></div></div><div class="br-small-categories" role="group" aria-label="Small categories" hidden></div>`;
+ const $=s=>root.querySelector(s),defs=$('defs');
  const add=(tag,attrs,parent)=>{const n=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);parent.append(n);return n;};
- function showTip(id){
-  hovered=id;const n=nodes.get(id);if(!n||!n.group.count){hideTip();return;}
-  tip.querySelector('strong').textContent=n.group.label+' · '+(n.group.share*100).toFixed(1)+'%';
-  tip.querySelector('span').textContent=state.selected===id?'Click to show all files':'Click to view files';
-  tip.hidden=false;root.dataset.hover=id;
- }
- function hideTip(){hovered='';tip.hidden=true;delete root.dataset.hover;}
- function create(g,i){
+ function activate(id){if(['resolved','ready'].includes(state.phase)&&nodes.get(id)?.group.count)onSelect(id);}
+ function hover(id){root.dataset.hover=id;}
+ function unhover(){delete root.dataset.hover;}
+ function create(g){
   const palette=colors[g.id]||['#9980ad','#d0bddf'];
-  const gradient=add('linearGradient',{id:uid+'-'+g.id,x1:'0',y1:'1',x2:'1',y2:'0'},defs);
-  add('stop',{'stop-color':palette[0]},gradient);add('stop',{offset:'1','stop-color':palette[1]},gradient);
-  const cloud=add('g',{'class':'br-cloud','data-bucket':g.id},connections);
-  const neck=add('path',{fill:palette[0],filter:`url(#${uid}-mist)`,opacity:'.2'},cloud);
-  const goo=add('g',{fill:palette[1],filter:`url(#${uid}-join)`,opacity:'.48'},cloud);
-  const anchor=add('circle',{r:'31'},goo),orb=add('ellipse',{rx:'64',ry:'54'},goo);
-  const path=add('path',{'class':'br-segment',fill:`url(#${uid}-${g.id})`,'data-bucket':g.id,role:'button',tabindex:'0'},segments);
-  const button=document.createElement('button');button.className='br-bubble';button.type='button';button.dataset.bucket=g.id;button.style.setProperty('--br-color',palette[0]);button.style.setProperty('--br-pale',palette[1]);
-  button.innerHTML='<span class="br-bubble-name"></span><strong class="br-bubble-percent"></strong><span class="br-bubble-arrow" aria-hidden="true">↗</span>';
-  bubbles.append(button);
-  const activate=()=>{if(nodes.get(g.id)?.group.count&&['resolved','ready'].includes(state.phase)){hideTip();onSelect(g.id);}};
-  button.addEventListener('click',activate);path.addEventListener('click',activate);path.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate();}if(e.key==='Escape')hideTip();});
-  path.addEventListener('pointerenter',()=>showTip(g.id));path.addEventListener('pointerleave',hideTip);path.addEventListener('focus',()=>{if(!suppressFocusTip&&path.matches(':focus-visible'))showTip(g.id);});path.addEventListener('blur',hideTip);
-  button.addEventListener('pointerenter',()=>{root.dataset.hover=g.id;});button.addEventListener('pointerleave',()=>{delete root.dataset.hover;});
-  const n={group:g,index:i,path,button,cloud,neck,anchor,orb,p:1,velocity:0,target:0,x:g.x,y:g.y};nodes.set(g.id,n);return n;
+  const gradient=add('linearGradient',{id:`${uid}-${g.id}`,gradientUnits:'userSpaceOnUse',x1:320,y1:510,x2:660,y2:60},defs);
+  add('stop',{'stop-color':palette[0]},gradient);add('stop',{offset:1,'stop-color':palette[1]},gradient);
+  const mutedGradient=add('linearGradient',{id:`${uid}-${g.id}-muted`,gradientUnits:'userSpaceOnUse',x1:320,y1:510,x2:660,y2:60},defs);
+  add('stop',{'stop-color':muted(palette[0])},mutedGradient);add('stop',{offset:1,'stop-color':muted(palette[1])},mutedGradient);
+  const labelPath=add('path',{id:`${uid}-${g.id}-label`},defs);
+  const path=add('path',{'class':'br-segment','data-bucket':g.id,fill:`url(#${uid}-${g.id})`,role:'button',tabindex:0},$('.br-bodies'));
+  const title=add('title',{},path);
+  const head=add('g',{'class':'br-head','data-bucket':g.id},$('.br-heads'));
+  const shadow=add('path',{'class':'br-head-shadow',fill:'none',stroke:'#68566c','stroke-width':5,opacity:.17,filter:`url(#${uid}-shadow)`},head);
+  const cap=add('path',{fill:`url(#${uid}-${g.id})`},head);
+  const label=add('g',{'class':'br-label','data-bucket':g.id},$('.br-labels'));
+  const arrow=add('path',{'class':'br-arrow',d:'M-10 0 H9 M1 -8 L9 0 L1 8',fill:'none','stroke-linecap':'round','stroke-linejoin':'round','stroke-width':2.7},label);
+  const text=add('text',{'class':'br-arc-text'},label),textPath=add('textPath',{href:`#${uid}-${g.id}-label`},text);
+  const fallback=document.createElement('button');fallback.type='button';fallback.className='br-small-category';fallback.dataset.bucket=g.id;fallback.style.setProperty('--category-color',palette[0]);$('.br-small-categories').append(fallback);
+  path.addEventListener('click',()=>activate(g.id));head.addEventListener('click',()=>activate(g.id));fallback.addEventListener('click',()=>activate(g.id));
+  path.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate(g.id);}});
+  [path,head,fallback].forEach(n=>{n.addEventListener('pointerenter',()=>hover(g.id));n.addEventListener('pointerleave',unhover);});
+  path.addEventListener('focus',()=>hover(g.id));path.addEventListener('blur',unhover);
+  const n={group:g,path,title,head,shadow,cap,label,arrow,text,textPath,labelPath,gradient,mutedGradient,fallback};nodes.set(g.id,n);return n;
  }
- function paint(n){
-  const g=n.group,p=Math.max(0,Math.min(1,n.p)),moving=!mq.matches&&!paused,freedom=1-p;
-  const dx=moving?Math.sin(clock/(3600+n.index*690)+n.index*1.8)*(5+n.index*.6):0;
-  const dy=moving?Math.sin(clock/(2900+n.index*910)+n.index*2.4)*(4+n.index*.8):0;
-  const x=g.x+(g.anchorX-g.x)*p+dx*freedom,y=g.y+(g.anchorY-g.y)*p+dy*freedom,scale=1-p*.72;
-  n.x=x;n.y=y;
-  n.button.style.left=(x/10)+'%';n.button.style.top=(y/5.9)+'%';
-  n.button.style.transform=`translate(-50%,-50%) scale(${scale})`;
-  n.button.style.opacity=String(Math.max(0,1-p*2.15));
-  n.button.style.setProperty('--br-text-opacity',String(Math.max(0,1-p*4)));
-  n.anchor.setAttribute('cx',g.anchorX);n.anchor.setAttribute('cy',g.anchorY);
-  n.orb.setAttribute('cx',x);n.orb.setAttribute('cy',y);n.orb.setAttribute('rx',64*scale);n.orb.setAttribute('ry',54*scale);
-  const vx=x-g.anchorX,vy=y-g.anchorY,length=Math.hypot(vx,vy)||1,nx=-vy/length,ny=vx/length,a=26,b=24*scale,mx=g.anchorX+vx*.57,my=g.anchorY+vy*.57;
-  n.neck.setAttribute('d',`M${g.anchorX+nx*a} ${g.anchorY+ny*a} Q${mx} ${my} ${x+nx*b} ${y+ny*b} L${x-nx*b} ${y-ny*b} Q${mx} ${my} ${g.anchorX-nx*a} ${g.anchorY-ny*a} Z`);
-  n.cloud.style.opacity=String((g.share?1:0)*(1-p*.95));
- }
- function step(now){
-  frame=0;if(destroyed)return;
-  const dt=Math.min(.035,last?(now-last)/1000:1/60);last=now;clock+=dt*1000;
-  let unsettled=false;
-  for(const n of nodes.values()){
-   if(mq.matches){n.p=n.target;n.velocity=0;}else{
-    n.velocity+=((n.target-n.p)*190-n.velocity*26)*dt;n.p+=n.velocity*dt;
-    if(Math.abs(n.p-n.target)<.0005&&Math.abs(n.velocity)<.004){n.p=n.target;n.velocity=0;}else unsettled=true;
-   }
-   paint(n);
+ function fitLabels(){
+  if(destroyed)return;
+  for(const n of nodes.values())if(n.group.labelFits){
+   n.text.setAttribute('font-size',n.group.fontSize);
+   const available=n.labelPath.getTotalLength()-5,measured=n.text.getComputedTextLength();
+   if(measured>available)n.text.setAttribute('font-size',n.group.fontSize*available/measured);
   }
-  if(shouldRun()&&(!paused||unsettled))frame=requestAnimationFrame(step);
  }
- function shouldRun(){return !destroyed&&visible&&!document.hidden&&!mq.matches&&['ready','resolved'].includes(state.phase);}
- function kick(){if(shouldRun()&&!frame){last=0;frame=requestAnimationFrame(step);}else if(mq.matches||!visible||document.hidden){for(const n of nodes.values()){n.p=n.target;n.velocity=0;paint(n);}}}
+ document.fonts?.ready.then(fitLabels);
  function update(next){
-  state={...state,...next};const layout=buildBubbleLayout(state.groups),present=new Set(layout.map(g=>g.id));
-  for(const[id,n]of nodes)if(!present.has(id)){n.path.remove();n.cloud.remove();n.button.remove();nodes.delete(id);}
-  layout.forEach((g,i)=>{
-   const n=nodes.get(g.id)||create(g,i);n.group=g;n.index=i;n.target=state.selected===g.id?1:0;
-   const selected=state.selected===g.id,active=!!g.count&&['resolved','ready'].includes(state.phase);
-   n.path.setAttribute('d',g.path);n.path.setAttribute('aria-pressed',String(selected));n.path.setAttribute('aria-label',`${g.label}: ${(g.share*100).toFixed(1)} percent, ${g.count} files. ${selected?'Show all files.':'Click to view files.'}`);n.path.setAttribute('tabindex',active&&g.share?'0':'-1');n.path.setAttribute('aria-disabled',String(!active));n.path.classList.toggle('is-muted',!!state.selected&&!selected);n.path.classList.toggle('is-selected',selected);
-   n.button.querySelector('.br-bubble-name').textContent=g.label;n.button.querySelector('.br-bubble-percent').textContent=(g.share*100).toFixed(1)+'%';
-   n.button.setAttribute('aria-label',`${g.label}, ${(g.share*100).toFixed(1)} percent, ${g.count} files. Click to view files.`);
-   if(selected&&document.activeElement===n.button){suppressFocusTip=true;n.path.focus({preventScroll:true});suppressFocusTip=false;}
-   n.button.disabled=!active||selected;n.button.setAttribute('aria-hidden',String(selected));n.button.dataset.empty=String(!g.count);
-   if(mq.matches){n.p=n.target;n.velocity=0;}paint(n);
+  state={...state,...next};const layout=buildRibbonLayout(state.groups),present=new Set(layout.map(g=>g.id));
+  for(const[id,n]of nodes)if(!present.has(id)){[n.path,n.head,n.label,n.fallback,n.labelPath,n.gradient,n.mutedGradient].forEach(el=>el.remove());nodes.delete(id);}
+  let small=0;
+  layout.forEach(g=>{
+   const n=nodes.get(g.id)||create(g);n.group=g;const selected=state.selected===g.id;
+   n.path.setAttribute('d',g.bodyPath);n.shadow.setAttribute('d',g.headEdgePath);n.cap.setAttribute('d',g.headPath);
+   const fill=`url(#${uid}-${g.id}${state.selected&&!selected?'-muted':''})`;n.path.setAttribute('fill',fill);n.cap.setAttribute('fill',fill);
+   n.labelPath.setAttribute('d',g.labelPath);n.textPath.textContent=g.label;n.textPath.setAttribute('startOffset',g.reverse?'0%':'100%');n.text.setAttribute('text-anchor',g.reverse?'start':'end');n.text.setAttribute('font-size',g.fontSize);n.label.style.display=g.labelFits?'':'none';
+   n.arrow.setAttribute('transform',`translate(${g.headX} ${g.headY}) rotate(${g.arrowRotation})`);
+   n.path.setAttribute('aria-label',`${g.label}, ${g.count} files. ${selected?'Click to show all files.':'Click to view files.'}`);n.path.setAttribute('aria-pressed',String(selected));
+   n.title.textContent=`${g.label} · ${selected?'Click to show all files':'Click to view files'}`;
+   [n.path,n.head,n.label,n.fallback].forEach(el=>{el.classList.toggle('is-muted',!!state.selected&&!selected);el.classList.toggle('is-selected',selected);});
+   n.fallback.hidden=g.labelFits||!g.count;n.fallback.textContent=g.label;n.fallback.setAttribute('aria-pressed',String(selected));if(!n.fallback.hidden)small++;
   });
-  const selected=layout.find(g=>g.id===state.selected);
-  $('.br-center-label').textContent=selected?selected.label:state.metric==='files'?'Project files':'Project storage';
-  $('.br-center-value').textContent=selected?(selected.share*100).toFixed(1)+'%':state.metric==='files'?String(state.totalCount):formatStorage(state.totalSize);
-  $('.br-center-detail').textContent=selected?`${selected.count} files`:state.metric==='files'?formatStorage(state.totalSize):`${state.totalCount} files`;
-  $('.br-reset').hidden=!selected;root.dataset.selection=state.selected||'';
-  setPhase(state.phase);if(hovered)showTip(hovered);kick();
+  $('.br-small-categories').hidden=!small;
+  $('.br-center-label').textContent=state.metric==='files'?'Project files':'Project storage';
+  $('.br-center-value').textContent=state.metric==='files'?String(state.totalCount):formatStorage(state.totalSize);
+  $('.br-center-detail').textContent=state.metric==='files'?formatStorage(state.totalSize):`${state.totalCount} files`;
+  root.dataset.selection=state.selected||'';fitLabels();setPhase(state.phase);
  }
  function setPhase(phase){
-  state.phase=phase;root.dataset.phase=phase;const enabled=['resolved','ready'].includes(phase);bubbles.inert=!enabled;
-  for(const n of nodes.values()){n.button.disabled=!enabled||!n.group.count||state.selected===n.group.id;n.path.setAttribute('tabindex',enabled&&n.group.share&&n.group.count?'0':'-1');n.path.setAttribute('aria-disabled',String(!enabled||!n.group.count));}
-  if(!enabled){if(frame)cancelAnimationFrame(frame);frame=0;hideTip();}else kick();
+  state.phase=phase;root.dataset.phase=phase;const enabled=['resolved','ready'].includes(phase);
+  for(const n of nodes.values()){
+   n.path.setAttribute('tabindex',enabled&&n.group.share&&n.group.count?'0':'-1');n.path.setAttribute('aria-disabled',String(!enabled||!n.group.count));n.fallback.disabled=!enabled||!n.group.count;
+  }
+  if(!enabled)unhover();
  }
- $('.br-reset').onclick=()=>onSelect('');
- const motion=$('.br-motion');motion.onclick=()=>{paused=!paused;motion.setAttribute('aria-pressed',String(paused));motion.setAttribute('aria-label',paused?'Resume bubble motion':'Pause bubble motion');motion.querySelector('span').textContent=paused?'Resume motion':'Pause motion';if(paused){if(frame)cancelAnimationFrame(frame);frame=0;}kick();};
- const visibility=()=>{if(document.hidden){if(frame)cancelAnimationFrame(frame);frame=0;}else kick();};
- const preference=()=>{if(frame)cancelAnimationFrame(frame);frame=0;motion.hidden=mq.matches;for(const n of nodes.values()){n.p=n.target;n.velocity=0;paint(n);}kick();};
- document.addEventListener('visibilitychange',visibility);mq.addEventListener?.('change',preference);motion.hidden=mq.matches;
- const observer=typeof IntersectionObserver==='function'?new IntersectionObserver(entries=>{visible=entries[0]?.isIntersecting!==false;if(!visible){if(frame)cancelAnimationFrame(frame);frame=0;}else kick();},{threshold:.05}):null;observer?.observe(root);
- return {update,setPhase,destroy(){destroyed=true;if(frame)cancelAnimationFrame(frame);frame=0;observer?.disconnect();mq.removeEventListener?.('change',preference);document.removeEventListener('visibilitychange',visibility);nodes.clear();root.innerHTML='';}};
+ return {update,setPhase,destroy(){destroyed=true;nodes.clear();root.innerHTML='';delete root.dataset.hover;}};
 }

@@ -1,7 +1,7 @@
 import {suggestionBadge,recommendationDetails} from './recommendation-ui.js';
 import {BUCKETS, formatStorage, searchFiles} from './data.js';
 import {rankFiles} from './mode-model.js';
-import {createBubbleRing} from './bubble-ring.js';
+import {createRibbonRing} from './bubble-ring.js';
 import {createOverviewSequence} from './quick-loading.js';
 
 // Quick Clear deliberately exposes a preview, not the detailed decision workspace.
@@ -107,7 +107,7 @@ export function createQuickMode({root,getFiles,getState,thumb,badge,fileArt,hydr
   const data=overviewData(),active=data.groups.find(b=>b.id===bucket);
   ringUI?.update({...data,selected:bucket,metric,phase:root.dataset.phase||'ready'});
   $('.qc-summary').dataset.bucket=bucket;
-  $('.qc-summary-copy').innerHTML=active?`<span class="qc-summary-category">${esc(active.label)}</span><strong>${number(esc(formatStorage(active.size)))}</strong><span class="qc-final-meta">${active.count} ${active.count===1?'file':'files'}</span>`:`<strong>${number(esc(formatStorage(data.potential)))}</strong><span>potential to clear</span>`;
+  $('.qc-summary-copy').innerHTML=active?`<span class="qc-summary-category">${esc(active.label)}</span><span class="qc-final-meta qc-summary-percent">${(active.share*100).toFixed(1)}%</span><strong class="qc-summary-storage">${number(esc(formatStorage(active.size)))}</strong><span class="qc-final-meta">${active.count} ${active.count===1?'file':'files'}</span>`:`<strong>${number(esc(formatStorage(data.potential)))}</strong><span>potential to clear</span>`;
   $('.qc-orbit-reset').hidden=!bucket;
   const suggested=$('[data-qc-suggested]');suggested.disabled=!data.pendingTrash.length;suggested.hidden=!!bucket&&bucket!=='trash';suggested.innerHTML=`Select suggested Trash <span class="qc-final-meta">(${data.pendingTrash.length})</span><span aria-hidden="true">↘</span>`;
   root.querySelectorAll('[data-qc-metric]').forEach(b=>b.setAttribute('aria-pressed',String(metric===b.dataset.qcMetric)));
@@ -129,7 +129,7 @@ export function createQuickMode({root,getFiles,getState,thumb,badge,fileArt,hydr
   <span class="sr-only qc-loading-status" role="status" aria-live="polite"></span><div class="qc-results"><div class="qc-results-inner"><div class="qc-list-toolbar"><div class="qc-list-heading"><h2>${bucket?esc(BUCKETS.find(b=>b.id===bucket).label):'Ready to review'}</h2><span class="qc-list-count"></span><button type="button" class="qc-filter-clear">Clear filter ×</button></div><div class="qc-list-tools"><button type="button" class="qc-button qc-soft" data-qc-suggested></button><form class="qc-search" role="search"><label class="sr-only" for="qc-search-input">Search project files</label><input id="qc-search-input" type="search" placeholder="Find a file…" value="${esc(query)}"><button type="submit" aria-label="Search project files">↗</button></form></div></div>
   <div class="qc-table" role="group" aria-label="Files by cleanup priority"><div class="qc-table-head"><input type="checkbox" data-qc-all aria-label="Select all visible files"><span>Priority</span><span>File</span><span>AI suggestion</span><span>Size</span><span>Modified</span><span></span></div><div class="qc-list-body"></div></div>
   </div></div><div class="qc-selection-bar" hidden><div><strong class="qc-selection-total" aria-live="polite"></strong><span class="qc-selection-size"></span></div><button type="button" class="qc-selection-clear" aria-label="Clear selection">×</button><span class="qc-selection-divider" aria-hidden="true"></span><button type="button" class="qc-button" data-qc-check>Preview selection <span aria-hidden="true">↗</span></button><button type="button" class="qc-button" data-qc-archive>Archive</button><button type="button" class="qc-button qc-primary" data-qc-trash>Move to Trash</button></div>`;
-  ringUI=createBubbleRing({root:$('.qc-orbit'),onSelect:selectBucket});
+  ringUI=createRibbonRing({root:$('.qc-orbit'),onSelect:selectBucket});
   updateOverview();
   root.querySelectorAll('[data-qc-metric]').forEach(b=>b.onclick=()=>{metric=b.dataset.qcMetric;updateOverview();});
   $('.qc-orbit-reset').onclick=()=>{bucket='';updateOverview();renderRows();};

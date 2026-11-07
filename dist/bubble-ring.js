@@ -1,9 +1,9 @@
 import {formatStorage} from './data.js';
 
 const NS='http://www.w3.org/2000/svg',TAU=Math.PI*2,CX=500,CY=288,R=214,W=72;
-const colors={keep:['#7bab9d','#b6d9c9'],archive:['#a184bf','#d2bde6'],trash:['#c67c97','#efb2bf'],undecided:['#8797b9','#c2cee3']};
+const colors={keep:['#92b9aa','#c1d8cc','#a3c5b6'],archive:['#ad94c6','#d1bfe1','#b9a3d0'],trash:['#ca8da5','#dfadc0','#d69cb3'],undecided:['#98a9c8','#c7d1e5','#acbbd7']};
 const safe=n=>Number.isFinite(n)&&n>0?n:0;
-const muted=color=>'#'+[1,3,5].map((offset,i)=>Math.round(parseInt(color.slice(offset,offset+2),16)*.24+[249,247,250][i]*.76).toString(16).padStart(2,'0')).join('');
+const muted=color=>'#'+[1,3,5].map((offset,i)=>Math.round(parseInt(color.slice(offset,offset+2),16)*.4+[249,247,250][i]*.6).toString(16).padStart(2,'0')).join('');
 const point=(radius,angle)=>[CX+radius*Math.cos(angle),CY+radius*Math.sin(angle)];
 const p=xy=>xy.map(n=>Number(n.toFixed(4))).join(' ');
 function arc(radius,start,end,sweep=1){
@@ -27,7 +27,10 @@ export function buildRibbonLayout(groups=[]){
   const reverse=Math.sin(end)>0,head=point(R,end),outer=point(R+W/2,end),inner=point(R-W/2,end);
   const hasCap=span>=.4&&span<TAU-.000001;
   const headEdgePath=hasCap?`M${p(outer)} A${W/2} ${W/2} 0 0 1 ${p(inner)}`:'';
-  const headPath=headEdgePath?headEdgePath+' Z':'';
+  // Overlap the body's exact circular edges by ~1.7 units. Two coincident,
+  // antialiased edges otherwise reveal a pale hairline through the join.
+  const joinStart=end-.008;
+  const headPath=hasCap?`${arc(R+W/2,joinStart,end)} A${W/2} ${W/2} 0 0 1 ${p(inner)} ${arc(R-W/2,end,joinStart,0).replace(/^M[^A]+/,'')} Z`:'';
   const labelStart=start+.18,labelEnd=end-.10,available=Math.max(0,(labelEnd-labelStart)*R);
   const fontSize=Math.min(25,available/Math.max(1,String(g.label||g.id||'').length*.56));
   const labelFits=share>0&&fontSize>=16;
@@ -49,16 +52,18 @@ export function createRibbonRing({root,onSelect=()=>{}}){
  function hover(id){root.dataset.hover=id;}
  function unhover(){delete root.dataset.hover;}
  function create(g){
-  const palette=colors[g.id]||['#9980ad','#d0bddf'];
+  const palette=colors[g.id]||['#baa9cd','#e3dbee','#cbbbdc'];
   const gradient=add('linearGradient',{id:`${uid}-${g.id}`,gradientUnits:'userSpaceOnUse',x1:320,y1:510,x2:660,y2:60},defs);
-  add('stop',{'stop-color':palette[0]},gradient);add('stop',{offset:1,'stop-color':palette[1]},gradient);
+  // Opaque shared stops bake the satin light into one surface: no translucent
+  // overlays that could double the highlight where the cap overlaps the body.
+  palette.forEach((color,i)=>add('stop',{offset:[0,.58,1][i],'stop-color':color},gradient));
   const mutedGradient=add('linearGradient',{id:`${uid}-${g.id}-muted`,gradientUnits:'userSpaceOnUse',x1:320,y1:510,x2:660,y2:60},defs);
-  add('stop',{'stop-color':muted(palette[0])},mutedGradient);add('stop',{offset:1,'stop-color':muted(palette[1])},mutedGradient);
+  palette.forEach((color,i)=>add('stop',{offset:[0,.58,1][i],'stop-color':muted(color)},mutedGradient));
   const labelPath=add('path',{id:`${uid}-${g.id}-label`},defs);
   const path=add('path',{'class':'br-segment','data-bucket':g.id,fill:`url(#${uid}-${g.id})`,role:'button',tabindex:0},$('.br-bodies'));
   const title=add('title',{},path);
   const head=add('g',{'class':'br-head','data-bucket':g.id},$('.br-heads'));
-  const shadow=add('path',{'class':'br-head-shadow',fill:'none',stroke:'#68566c','stroke-width':5,opacity:.17,filter:`url(#${uid}-shadow)`},head);
+  const shadow=add('path',{'class':'br-head-shadow',fill:'none',stroke:'#85758c','stroke-width':4,opacity:.11,filter:`url(#${uid}-shadow)`},head);
   const cap=add('path',{fill:`url(#${uid}-${g.id})`},head);
   const label=add('g',{'class':'br-label','data-bucket':g.id},$('.br-labels'));
   const arrow=add('path',{'class':'br-arrow',d:'M-10 0 H9 M1 -8 L9 0 L1 8',fill:'none','stroke-linecap':'round','stroke-linejoin':'round','stroke-width':2.7},label);

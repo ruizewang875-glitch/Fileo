@@ -107,7 +107,7 @@ export function createQuickMode({root,getFiles,getState,thumb,badge,fileArt,hydr
   const data=overviewData(),active=data.groups.find(b=>b.id===bucket);
   ringUI?.update({...data,selected:bucket,metric,phase:root.dataset.phase||'ready'});
   $('.qc-summary').dataset.bucket=bucket;
-  $('.qc-summary-copy').innerHTML=active?`<span class="qc-summary-category">${esc(active.label)}</span><span class="qc-final-meta qc-summary-percent">${(active.share*100).toFixed(1)}%</span><strong class="qc-summary-storage">${number(esc(formatStorage(active.size)))}</strong><span class="qc-final-meta">${active.count} ${active.count===1?'file':'files'}</span>`:`<strong>${number(esc(formatStorage(data.potential)))}</strong><span>potential to clear</span>`;
+  $('.qc-summary-copy').innerHTML=active?`<span class="qc-summary-category">${esc(active.label)}</span><div class="qc-summary-values"><span class="qc-final-meta qc-summary-percent">${(active.share*100).toFixed(1)}%</span><strong class="qc-summary-storage">${number(esc(formatStorage(active.size)))}</strong><span class="qc-final-meta">${active.count} ${active.count===1?'file':'files'}</span></div>`:`<strong>${number(esc(formatStorage(data.potential)))}</strong><span>potential to clear</span>`;
   $('.qc-orbit-reset').hidden=!bucket;
   const suggested=$('[data-qc-suggested]');suggested.disabled=!data.pendingTrash.length;suggested.hidden=!!bucket&&bucket!=='trash';suggested.innerHTML=`Select suggested Trash <span class="qc-final-meta">(${data.pendingTrash.length})</span><span aria-hidden="true">↘</span>`;
   root.querySelectorAll('[data-qc-metric]').forEach(b=>b.setAttribute('aria-pressed',String(metric===b.dataset.qcMetric)));

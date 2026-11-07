@@ -67,7 +67,7 @@
 .qc-row[data-bucket=keep]{--qc-ink:#568a7b;--qc-tint:#dfede6}
 .qc-row[data-bucket=archive]{--qc-ink:#9474b0;--qc-tint:#e9e0f1}
 .qc-row[data-bucket=trash]{--qc-ink:#b36488;--qc-tint:#efdae4}
-.qc-row:first-child{border-radius:12px 12px 0 0}
+.qc-row{border-radius:0}
 .qc-row:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--qc-ink) 14%,transparent)}
 .qc-row.is-selected{box-shadow:inset 3px 0 var(--qc-ink),inset 0 0 0 1px color-mix(in srgb,var(--qc-ink) 28%,transparent)}
 .qc-row.is-trashed{opacity:.57}

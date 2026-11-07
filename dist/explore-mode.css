@@ -147,3 +147,9 @@
 .explore-view-chip{display:inline-flex;align-items:center;gap:7px;min-height:30px;padding:6px 10px;border:1px solid #ddcfe3;border-radius:7px;color:#93719c;background:#f1e9f4;font-size:11px;line-height:1.3;white-space:nowrap}
 .explore-view-chip:hover{background:#eaddf0;border-color:#c5a8ce;color:#7d538c}
 @media(max-width:600px){.explore-view-chip{margin-top:8px}}
+
+/* Per-file reasons stay visible; each chip opens its own explanation. */
+.explore-card-reasons{margin-top:14px;padding-top:13px;border-top:1px solid #e8e0eb}
+.explore-card-reasons .rec-tags{display:flex;gap:7px}
+.explore-card-reasons .rec-tag{font-size:11px;min-height:29px}
+@media(max-width:600px){.explore-card-reasons{margin-top:11px;padding-top:10px}.explore-card-reasons .rec-tag{font-size:10px}}

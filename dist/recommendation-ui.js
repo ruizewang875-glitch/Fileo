@@ -1,32 +1,30 @@
 const choices={keep:'Keep',archive:'Archive',trash:'Trash',undecided:'Undecided'};
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key=file=>Object.hasOwn(choices,file?.bucket)?file.bucket:'undecided';
-const arrow='<svg aria-hidden="true" viewBox="0 0 16 16" fill="none"><path d="m4 6 4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const info='<svg class="rec-info" aria-hidden="true" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.75" stroke="currentColor" stroke-width="1.25"/><path d="M8 7.25v3.25" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="5.3" r=".75" fill="currentColor"/></svg>';
-const evidence=f=>Array.isArray(f.reasonTags)&&f.reasonTags.some(t=>typeof t==='string'&&t.trim())?f.reasonTags.filter(t=>typeof t==='string'&&t.trim()).slice(0,4):['File metadata'];
-const tagsHTML=f=>'<span class="rec-tags">'+evidence(f).map(t=>'<span class="rec-tag'+(t.startsWith('Preference: ')?' rec-tag-pref':'')+'">'+escape(t)+'</span>').join('')+'</span>';
-const reason=f=>f.reason||f.baseReason||'There is not enough evidence to make a stronger recommendation.';
-// Read receipts are supplied by the permission-aware workspace, never inferred
-// from a file extension or the presence of a decorative demo thumbnail.
-const readIcon='<svg aria-hidden="true" viewBox="0 0 16 16" fill="none"><path d="m3.5 8 3 3 6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-function readReceipt(file){
- const access=file.readAccess,known=['success','disabled','pending','limited'].includes(access?.status);
- const status=known?access.status:'pending',success=status==='success',demo=access?.demo===true;
- const label=success?'Successfully read':known&&access.label?access.label:'Reading permission not confirmed';
- const items=['success','limited'].includes(status)&&Array.isArray(access?.items)?access.items.filter(item=>typeof item==='string'&&item.trim()):[];
- return '<section class="rec-read-receipt" data-read-status="'+status+'" aria-label="Information used for this suggestion"><div class="rec-read-heading">'+(success?'<span class="rec-read-check">'+readIcon+'</span>':'')+'<strong>'+escape(label)+'</strong>'+(demo?'<span class="rec-read-demo">Demo</span>':'')+'</div><span class="rec-read-file">'+escape(file.file)+'</span>'+(items.length?'<ul class="rec-read-items">'+items.map(item=>'<li>'+escape(item)+'</li>').join('')+'</ul>':'')+'<button type="button" class="rec-privacy-link" data-privacy-open>Privacy &amp; data access '+arrow+'</button></section>';
+const closeIcon='<svg aria-hidden="true" viewBox="0 0 16 16" fill="none"><path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+const evidence=f=>Array.isArray(f?.reasonTags)&&f.reasonTags.some(t=>typeof t==='string'&&t.trim())?f.reasonTags.filter(t=>typeof t==='string'&&t.trim()).slice(0,4):['File metadata'];
+function signals(file){
+ const supplied=Array.isArray(file?.reasonSignals)?file.reasonSignals:[];
+ return evidence(file).map(tag=>{
+  const signal=supplied.find(item=>item&&item.tag===tag&&typeof item.explanation==='string'&&item.explanation.trim());
+  return {tag,explanation:signal?.explanation||(evidence(file).length===1?(file.reason||file.baseReason):null)||'This signal is included in the suggestion, but a separate explanation is not available. Review the file before deciding.'};
+ });
 }
-const rationale=file=>readReceipt(file)+'<p class="rec-reason-copy">'+escape(reason(file))+'</p>';
-export function suggestionBadge(file,{interactive=false}={}){
- const bucket=key(file),label=choices[bucket],copy='<span aria-hidden="true">✦</span><span>AI · '+label+'</span>';
+export function recommendationTags(file){
+ return '<span class="rec-tags" role="group" aria-label="AI recommendation reasons">'+signals(file).map((signal,index)=>'<button type="button" class="rec-tag'+(signal.tag.startsWith('Preference: ')?' rec-tag-pref':'')+'" data-rec-file="'+escape(file.id)+'" data-rec-signal="'+index+'" aria-label="Explain '+escape(signal.tag)+' for '+escape(file.file)+'" aria-expanded="false" aria-haspopup="dialog">'+escape(signal.tag)+'</button>').join('')+'</span>';
+}
+export function suggestionBadge(file,{interactive=false,variant='badge'}={}){
+ const bucket=key(file),label=choices[bucket];
+ if(variant==='tile')return '<span class="ai-badge rec-static-badge rec-category-tile" data-bucket="'+bucket+'" aria-label="AI suggestion: '+label+'"><span class="rec-tile-source"><span aria-hidden="true">✦</span> AI</span><strong>'+label+'</strong></span>';
+ const copy='<span aria-hidden="true">✦</span><span>AI · '+label+'</span>';
  if(!interactive)return '<span class="ai-badge rec-static-badge" data-bucket="'+bucket+'" aria-label="AI suggestion: '+label+'">'+copy+'</span>';
  return '<button type="button" class="ai-badge rec-badge" data-bucket="'+bucket+'" data-rec-file="'+escape(file.id)+'" aria-label="Why AI suggests '+label+' for '+escape(file.file)+'" aria-expanded="false" aria-haspopup="dialog">'+copy+info+'</button>';
 }
 export function recommendationDetails(file,{showBadge=true}={}){
- return '<section class="rec-evidence" aria-label="Recommendation evidence">'+(showBadge?suggestionBadge(file):'')+
- '<details class="rec-disclosure"><summary>'+tagsHTML(file)+'<span class="rec-disclose-label">Why? '+arrow+'</span><span class="sr-only">Show reasoning for '+escape(file.file)+'</span></summary><div class="rec-reason-body">'+rationale(file)+'</div></details></section>';
+ return '<section class="rec-evidence" aria-label="Recommendation evidence">'+(showBadge?suggestionBadge(file):'')+recommendationTags(file)+'</section>';
 }
-// Delegate once: lists are rerendered for filtering, decisions and project changes.
+// One delegated listener also covers filtered lists, preview dialogs and comparisons.
 export function installSuggestionPopovers({getFile}){
  let anchor=null,pop=null,observer=null,frame=0;
  function close({restore=false}={}){
@@ -49,24 +47,22 @@ export function installSuggestionPopovers({getFile}){
   pop.dataset.above=String(above);
  }
  function onMove(){if(anchor&&!frame)frame=requestAnimationFrame(place);}
- function open(button,focusDisclosure){
+ function open(button,focusClose){
   const f=getFile?.(button.dataset.recFile);if(!f)return;
-  close();anchor=button;pop=document.createElement('aside');pop.className='rec-popover';pop.id='fileo-suggestion-bubble';pop.setAttribute('role','dialog');pop.setAttribute('aria-label','Why AI suggests '+choices[key(f)]+' for '+f.file);
-  pop.innerHTML='<div class="rec-pop-summary">'+tagsHTML(f)+'<button type="button" class="rec-pop-toggle" aria-label="Detailed reasoning" aria-expanded="false" aria-controls="fileo-suggestion-reason">'+arrow+'</button></div><div hidden class="rec-reason-body" id="fileo-suggestion-reason">'+rationale(f)+'</div>';
-  const toggle=pop.querySelector('.rec-pop-toggle'),explanation=pop.querySelector('#fileo-suggestion-reason');
-  toggle.addEventListener('click',()=>{
-   explanation.hidden=!explanation.hidden;
-   toggle.setAttribute('aria-expanded',String(!explanation.hidden));
-   pop.classList.toggle('is-expanded',!explanation.hidden);
-   onMove();
-  });
-  const host=button.closest('dialog[open]')||document.body;
+  const available=signals(f),index=button.dataset.recSignal,signal=index===undefined?null:available[Number(index)];
+  if(index!==undefined&&!signal)return;
+  const origin=button.closest('.rec-popover')?anchor:button;if(!origin)return;
+  close();anchor=origin;pop=document.createElement('aside');pop.className='rec-popover';pop.id='fileo-suggestion-bubble';pop.setAttribute('role','dialog');pop.setAttribute('aria-labelledby','fileo-suggestion-title');
+  if(signal)pop.setAttribute('aria-describedby','fileo-suggestion-reason');
+  pop.innerHTML='<div class="rec-pop-heading"><strong id="fileo-suggestion-title">'+escape(signal?signal.tag:'AI · '+choices[key(f)])+'</strong><button type="button" class="rec-pop-close" aria-label="Close explanation">'+closeIcon+'</button></div>'+(signal?'<p class="rec-reason-copy" id="fileo-suggestion-reason">'+escape(signal.explanation)+'</p>':recommendationTags(f));
+  const dismiss=pop.querySelector('.rec-pop-close');dismiss.onclick=()=>close({restore:true});
+  const host=origin.closest('dialog[open]')||document.body;
   if(typeof pop.showPopover==='function')pop.setAttribute('popover','manual');
   host.append(pop);
   if(pop.hasAttribute('popover')){try{pop.showPopover();}catch{pop.removeAttribute('popover');}}
-  button.setAttribute('aria-expanded','true');button.setAttribute('aria-controls',pop.id);
+  origin.setAttribute('aria-expanded','true');origin.setAttribute('aria-controls',pop.id);
   place();if(!pop)return;
-  if(focusDisclosure)toggle.focus({preventScroll:true});
+  if(focusClose||origin!==button)dismiss.focus({preventScroll:true});
   observer=new MutationObserver(()=>{if(!anchor?.isConnected||anchor.closest('[hidden],[inert]')||!anchor.getClientRects().length)close();else onMove();});
   observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden','inert','open']});
  }
@@ -87,7 +83,7 @@ export function installSuggestionPopovers({getFile}){
    if(event.shiftKey&&event.target===controls[0]){event.preventDefault();close({restore:true});}
    else if(!event.shiftKey&&event.target===controls.at(-1))close({restore:true});
   }
-  else if(event.key==='Tab'&&!event.shiftKey&&event.target===anchor){event.preventDefault();pop.querySelector('.rec-pop-toggle').focus({preventScroll:true});}
+  else if(event.key==='Tab'&&!event.shiftKey&&event.target===anchor){event.preventDefault();pop.querySelector('.rec-pop-close').focus({preventScroll:true});}
  }
  document.addEventListener('click',onClick,true);document.addEventListener('focusin',onFocus);document.addEventListener('keydown',onKey,true);document.addEventListener('scroll',onMove,true);window.addEventListener('resize',onMove);
  return {close,destroy(){close();document.removeEventListener('click',onClick,true);document.removeEventListener('focusin',onFocus);document.removeEventListener('keydown',onKey,true);document.removeEventListener('scroll',onMove,true);window.removeEventListener('resize',onMove);}};

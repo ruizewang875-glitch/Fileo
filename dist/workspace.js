@@ -80,7 +80,7 @@ function refreshRecommendations(state,clock,projects=null){
    }
    return assessRecommendation(file,{files,tags,now:clock,privacy:state.privacy});
   });
-  files.forEach((file,i)=>{const result=results[i];file.bucket=result.bucket;file.reason=result.reason;file.reasonTags=[...result.tags];file.readAccess=result.readAccess;});
+  files.forEach((file,i)=>{const result=results[i];file.bucket=result.bucket;file.reason=result.reason;file.reasonTags=[...result.tags];file.reasonSignals=result.reasonSignals.map(signal=>({...signal}));file.readAccess=result.readAccess;});
  }
 }
 function restoreState(raw,clock) {

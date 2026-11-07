@@ -78,40 +78,50 @@ function matchGoal(tags,f,c,base){
 export function assessRecommendation(file,{files=[],tags=[],now=Date.now(),privacy}={}){
  const f=file||{};
  const readAccess=privacy===undefined?null:readAccessFor(f,privacy);
- if(readAccess&&['pending','disabled'].includes(readAccess.status))return {bucket:'undecided',reason:readAccess.status==='pending'?'Choose which file types AI may read in Privacy & AI access. You can still review this file yourself.':'AI reading is off for this file type. No AI recommendation is generated. You can review and organize the file yourself, or change its permission in Privacy & AI access.',tags:[readAccess.label],readAccess};
+ if(readAccess&&['pending','disabled'].includes(readAccess.status)){
+  const reason=readAccess.status==='pending'?'Choose which file types AI may read in Privacy & AI access. You can still review this file yourself.':'AI reading is off for this file type. No AI recommendation is generated. You can review and organize the file yourself, or change its permission in Privacy & AI access.';
+  return {bucket:'undecided',reason,tags:[readAccess.label],reasonSignals:[{tag:readAccess.label,explanation:reason}],readAccess};
+ }
  if(privacy!==undefined)files=(Array.isArray(files)?files:[]).filter(peer=>isReadingAllowed(peer,privacy));
  const base=validBuckets.has(f.baseBucket)?f.baseBucket:validBuckets.has(f.bucket)?f.bucket:'undecided';
- const c=contextOf(f,Array.isArray(files)?files:[],now),evidence=[],lines=[];
+ const c=contextOf(f,Array.isArray(files)?files:[],now),evidence=[],lines=[],signals=new Map();
  let bucket=base;
- const add=(tag,sentence)=>{if(tag&&!evidence.includes(tag))evidence.push(tag);if(sentence)lines.push(sentence);};
+ const add=(tag,sentence,explanation=sentence)=>{if(tag&&!evidence.includes(tag)){evidence.push(tag);signals.set(tag,explanation||'This file needs your review.');}if(sentence)lines.push(sentence);};
+ const copyWord=c.filename.match(copyMarker)?.[1]||'copy or backup';
+ const copyExplanation='“'+c.filename+'” contains the marker “'+copyWord+'”. This suggests a copied or backup version, but the name alone cannot prove that its contents are redundant.';
+ const sizeExplanation=peer=>'This file and “'+peer.file+'” are both listed at '+sizeLabel(f.size)+'. Equal file sizes support checking them together, but do not prove that their contents are identical.';
  if(c.exact){
-  add('Matching preview','Its preview matches “'+c.exact.file+'” in this project.');
-  if(f.size===c.exact.size)add('Same size','Both files are listed at '+sizeLabel(f.size)+'.');
-  if(c.isCopy)add('Copy in filename','Its filename marks it as a copy or backup.');
-  if(!c.isCopy&&base==='keep')add('Primary version','This version has no copy or backup marker in its name.');
-  if(base==='trash'&&c.exact.decision==='trash'){bucket='undecided';add('Peer in Trash','The matching version is already in Trash. Confirm which version to retain.');}
+  add('Matching preview','Its preview matches “'+c.exact.file+'” in this project.','This demo file shares its preview with “'+c.exact.file+'” in this project. The visible result matches; editable source data, layers or geometry may still differ. Review both before removing either.');
+  if(f.size===c.exact.size)add('Same size','Both files are listed at '+sizeLabel(f.size)+'.',sizeExplanation(c.exact));
+  if(c.isCopy)add('Copy in filename','Its filename marks it as a copy or backup.',copyExplanation);
+  if(!c.isCopy&&base==='keep')add('Primary version','This version has no copy or backup marker in its name.','“'+c.filename+'” has no copy or backup marker, while a matching preview exists in the project. It is a candidate to retain as the main version; the filename does not establish which version is authoritative.');
+  if(base==='trash'&&c.exact.decision==='trash'){bucket='undecided';add('Peer in Trash','The matching version is already in Trash. Confirm which version to retain.','The matching version “'+c.exact.file+'” is already in Trash. This suspends the earlier cleanup suggestion: choose which version to retain before removing another.');}
   if(base==='trash')lines.push('Matching previews do not establish that editable source data is identical.');
  }else if(!c.demo&&c.isCopy){
-  add('Copy in filename','“'+c.filename+'” contains a copy or backup marker.');
-  if(c.matchName){add('Related filename','“'+c.matchName.file+'” has the same name without that marker.');if(c.matchName.size===f.size)add('Same size','Both records show '+sizeLabel(f.size)+'.');}
-  if(c.matchName?.decision==='trash'){bucket='undecided';add('Peer in Trash','The related file is already in Trash. Check which file should stay.');}
+  add('Copy in filename','“'+c.filename+'” contains a copy or backup marker.',copyExplanation);
+  if(c.matchName){add('Related filename','“'+c.matchName.file+'” has the same name without that marker.','Removing the copy or backup marker from “'+c.filename+'” matches the name of “'+c.matchName.file+'” in this project. Their contents were not compared, so this is a filename relationship only.');if(c.matchName.size===f.size)add('Same size','Both records show '+sizeLabel(f.size)+'.',sizeExplanation(c.matchName));}
+  if(c.matchName?.decision==='trash'){bucket='undecided';add('Peer in Trash','The related file is already in Trash. Check which file should stay.','The related file “'+c.matchName.file+'” is already in Trash. This suspends the earlier cleanup suggestion: choose which version to retain. The filename relationship does not prove that their contents match.');}
   lines.push('Contents were not compared; a filename alone does not prove duplication.');
  }else{
-  if(c.variant)add('Distinct version','The preview differs from “'+c.variant.file+'”.');
+  if(c.variant)add('Distinct version','The preview differs from “'+c.variant.file+'”.','This demo preview differs from “'+c.variant.file+'” in the same visual series.'+(f.previewNote?' This version shows: '+label(f.previewNote).replace(/[.!?]$/,'')+'.':'')+' The visible difference is a reason to compare the versions instead of treating this file as an identical copy.');
   if(c.demo&&f.previewNote)lines.push(label(f.previewNote).replace(/[.!?]$/,'')+'.');
-  if(c.final)add('Final in filename','The filename marks this as a final or approved version.');
-  else if(c.draft)add('Working iteration','The filename identifies a draft, test or numbered iteration.');
-  else if(c.reference)add('Reference material','Its name or catalog tags identify reference material.');
+  if(c.final)add('Final in filename','The filename marks this as a final or approved version.','“'+c.filename+'” includes a final, approved or completed-version marker. This suggests a deliverable worth retaining; the name alone cannot confirm approval or whether a newer version exists.');
+  else if(c.draft)add('Working iteration','The filename identifies a draft, test or numbered iteration.','“'+c.filename+'” is named as a draft, test or numbered iteration. It may document an intermediate design decision; compare it with the other versions before deciding whether it is still useful.');
+  else if(c.reference)add('Reference material','Its name or catalog tags identify reference material.','The filename or catalog metadata for “'+c.filename+'” includes a research, brief, reference or field-notes theme. It may be useful for future work even if it is no longer part of the active project.');
   const ageTag=c.age!==null&&c.age>=180?'Older edit':c.age!==null&&c.age>=0&&c.age<=90?'Recent edit':null;
-  if(c.day)add(ageTag||dateTag(c.day),'Last edited on '+c.day+'.');
+  if(c.day)add(ageTag||dateTag(c.day),'Last edited on '+c.day+'.','The recorded modified date is '+c.day+'. '+(ageTag==='Older edit'?'It has been '+c.age+' days since that edit, which makes it worth checking for archival. Age alone does not mean the file is obsolete.':ageTag==='Recent edit'?'It was edited within the last 90 days, so it may still belong to your active work. This date does not show when it was last opened.':'This helps place the file in your project timeline; it does not establish when it was last opened or how valuable it is.'));
   if(!c.demo&&f.baseReason&&!c.final&&!c.draft&&!c.reference)lines.push(String(f.baseReason));
-  if(c.demo&&!c.variant&&!c.exact&&!c.final&&!c.draft&&!c.reference)add(f.status==='work'?'Working file':f.status==='ready'?'Project deliverable':'Project file',f.collection?'It belongs to the '+f.collection+' collection.':'');
+  if(c.demo&&!c.variant&&!c.exact&&!c.final&&!c.draft&&!c.reference)add(f.status==='work'?'Working file':f.status==='ready'?'Project deliverable':'Project file',f.collection?'It belongs to the '+f.collection+' collection.':'','The demo catalog identifies “'+c.filename+'” as '+(f.status==='work'?'work in progress':f.status==='ready'?'a project deliverable':'a project file')+(f.collection?' in the '+f.collection+' collection':'')+'. This project context helps you decide whether to keep it active or retain it in the archive.');
  }
  const goal=matchGoal(tags,f,c,bucket);
  if(goal){bucket=goal.outcome;lines.push('Project preference “'+goal.tag+'” applies: '+goal.explanation+'.');}
  if(!lines.length)lines.push(f.baseReason||'The available metadata does not establish how valuable this file is to your project.');
  lines.push(baseAfter[bucket]);
- if(!evidence.length)evidence.push(c.demo?'Sample metadata':'File metadata');
- const visible=goal?[...evidence.slice(0,2),'Preference: '+goal.tag]:evidence.slice(0,3);
- return {bucket,reason:lines.join(' '),tags:visible,...(readAccess?{readAccess}:{})};
+ if(!evidence.length){const tag=c.demo?'Sample metadata':'File metadata';evidence.push(tag);signals.set(tag,'The available record identifies “'+c.filename+'”'+(f.ext?' as a '+String(f.ext).replace(/^\./,'').toUpperCase()+' file':'')+(Number.isFinite(f.size)?' of '+sizeLabel(f.size):'')+'. There is not enough evidence to establish its value or redundancy; review it before making a decision.');}
+ // A changed peer decision can invalidate a cleanup suggestion. Keep that decisive
+ // signal visible even when the remaining evidence and a project preference compete.
+ const ordered=evidence.includes('Peer in Trash')?['Peer in Trash',...evidence.filter(tag=>tag!=='Peer in Trash')]:evidence;
+ const visible=goal?[...ordered.slice(0,2),'Preference: '+goal.tag]:ordered.slice(0,3);
+ if(goal)signals.set('Preference: '+goal.tag,'Your project preference “'+goal.tag+'” applies because '+goal.explanation+'. '+(bucket==='keep'?'It supports keeping this file in your active project.':bucket==='archive'?'It supports archiving this file while retaining it for later.':bucket==='trash'?'It prioritizes this candidate for cleanup review; it does not establish that deletion is safe.':'It keeps this file Undecided so you can resolve its value before anything is removed.'));
+ return {bucket,reason:lines.join(' '),tags:visible,reasonSignals:visible.map(tag=>({tag,explanation:signals.get(tag)})),...(readAccess?{readAccess}:{})};
 }

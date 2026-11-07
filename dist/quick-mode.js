@@ -3,10 +3,11 @@ import {BUCKETS, formatStorage, searchFiles} from './data.js';
 import {rankFiles} from './mode-model.js';
 import {createRibbonRing} from './bubble-ring.js';
 import {createOverviewSequence} from './quick-loading.js';
+import {createPreviewQueue,previewTrashTargets} from './quick-preview-model.js';
 
 // Quick Clear deliberately exposes a preview, not the detailed decision workspace.
-export function createQuickMode({root,getFiles,getState,thumb,badge,fileArt,hydrateArt,prettySize,escapeHtml:esc,onDecide}) {
- let metric='space',bucket='',query='',project=null,selected=new Set(),previewIds=[],previewIndex=0,previewBatch=false;
+export function createQuickMode({root,getFiles,getState,thumb,fileArt,hydrateArt,prettySize,escapeHtml:esc,onDecide}) {
+ let metric='space',bucket='',query='',project=null,selected=new Set(),previewIds=[],previewIndex=0;
  const decisionName={pending:'To review',keep:'Kept',archive:'Archived',trash:'In Trash'};
  const $=s=>root.querySelector(s);
  let ringUI=null;
@@ -30,7 +31,7 @@ export function createQuickMode({root,getFiles,getState,thumb,badge,fileArt,hydr
  const dialog=document.createElement('dialog');
  dialog.className='qc-preview-dialog';dialog.setAttribute('aria-labelledby','qc-preview-name');document.body.append(dialog);
  dialog.addEventListener('click',e=>{if(e.target!==dialog)return;const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();});
- dialog.addEventListener('keydown',e=>{if(/INPUT|TEXTAREA/.test(e.target.tagName))return;if(e.key==='ArrowLeft'&&previewIndex>0){e.preventDefault();previewIndex--;renderPreview();}if(e.key==='ArrowRight'&&previewIndex<previewIds.length-1){e.preventDefault();previewIndex++;renderPreview();}});
+ dialog.addEventListener('keydown',e=>{if(/TEXTAREA|SELECT/.test(e.target.tagName)||(e.target.tagName==='INPUT'&&e.target.type!=='checkbox')||e.target.closest('.rec-popover'))return;if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();movePreview(e.key==='ArrowLeft'?-1:1);}});
  const files=()=>rankFiles(getFiles());
  const selectable=f=>f.decision!=='trash';
  const visible=()=>searchFiles(query,files().filter(f=>!bucket||f.bucket===bucket));
@@ -46,28 +47,46 @@ export function createQuickMode({root,getFiles,getState,thumb,badge,fileArt,hydr
   if(!chosen.length)return;if(dialog.open)dialog.close();onDecide(chosen,decision);
  }
  function openPreview(ids,batch=false){
-  const valid=new Set(getFiles().map(f=>f.id));previewIds=[...new Set(ids)].filter(id=>valid.has(id));previewIndex=0;previewBatch=batch;
+  const valid=new Set(ids),scope=batch?files().filter(f=>valid.has(f.id)&&selectable(f)):visible();
+  const queue=createPreviewQueue(scope,batch?undefined:ids[0]);previewIds=queue.ids;previewIndex=queue.index;
   if(!previewIds.length)return;renderPreview();dialog.showModal();
  }
- function renderPreview(){
+ function movePreview(direction){
+  const next=previewIndex+direction;if(next<0||next>=previewIds.length)return;
+  previewIndex=next;renderPreview({focusTarget:direction<0?'[data-prev]':'[data-next]'});
+ }
+ function updatePreviewActions(){
+  const f=files().find(item=>item.id===previewIds[previewIndex]);if(!f)return;
+  const current=choiceFiles(),targets=previewTrashTargets(getFiles(),f.id,current.map(item=>item.id));
+  const input=dialog.querySelector('[data-preview-select]'),trash=dialog.querySelector('[data-trash]'),archive=dialog.querySelector('[data-archive]');
+  if(!input||!trash||!archive)return;
+  input.checked=selected.has(f.id);input.disabled=!selectable(f);
+  input.setAttribute('aria-label',selectable(f)?'Select '+f.file:'Already in Trash: '+f.file);
+  trash.disabled=!targets.ids.length;trash.dataset.batch=String(targets.batch);
+  trash.textContent=targets.batch?'Move '+targets.ids.length+' files to Trash':'Move to Trash';
+  trash.setAttribute('aria-label',targets.batch?'Move '+targets.ids.length+' selected files to Trash':'Move '+f.file+' to Trash');
+  trash.title=targets.batch?'Move only the '+targets.ids.length+' selected files to Trash':'Move '+f.file+' to Trash';
+  archive.disabled=!selectable(f);archive.setAttribute('aria-label','Archive '+f.file);
+  const live=dialog.querySelector('.qc-preview-position');if(live)live.textContent='File '+(previewIndex+1)+' of '+previewIds.length+'. '+f.file+'. '+current.length+' '+(current.length===1?'file':'files')+' selected.';
+ }
+ function renderPreview({focusTarget=null}={}){
   const all=files(),f=all.find(item=>item.id===previewIds[previewIndex]);if(!f){dialog.close();return;}
-  const current=choiceFiles();
+  const category=BUCKETS.find(item=>item.id===f.bucket)||BUCKETS.find(item=>item.id==='undecided');
   dialog.dataset.fileId=f.id;
-  dialog.innerHTML=`<div class="qc-preview-top"><span>${previewBatch?'Check selection':'Quick preview'}${previewIds.length>1?` <b>${previewIndex+1} / ${previewIds.length}</b>`:''}</span><button type="button" class="qc-icon" data-close aria-label="Close preview">×</button></div>
-   <div class="qc-preview-art">${fileArt(f)}</div>
-   <div class="qc-preview-caption"><div><h2 id="qc-preview-name">${esc(f.file)}</h2><p>${esc(f.app||f.ext)} <span>·</span> ${esc(prettySize(f))} <span>·</span> ${esc(f.modified||'')}</p></div>${badge(f)}</div>
-   <div class="qc-preview-insight">${recommendationDetails(f,{showBadge:false})}</div>
-   <div class="qc-preview-controls"><button type="button" class="qc-icon" data-prev aria-label="Previous preview" ${previewIndex===0?'disabled':''}>←</button>
-    <label class="qc-preview-select"><input type="checkbox" data-preview-select ${selected.has(f.id)?'checked':''} ${!selectable(f)?'disabled':''}><span>${!selectable(f)?'In Trash':'Select this file'}</span></label>
-    <button type="button" class="qc-icon" data-next aria-label="Next preview" ${previewIndex>=previewIds.length-1?'disabled':''}>→</button></div>
-   <div class="qc-preview-actions"><span>${previewBatch?`${current.length} selected · ${formatStorage(current.reduce((n,item)=>n+item.size,0))}`:esc(decisionName[f.decision]||'To review')}</span><button type="button" class="qc-button" data-archive ${previewBatch?!current.length?'disabled':'':!selectable(f)?'disabled':''}>${previewBatch?'Archive selected':'Archive'}</button><button type="button" class="qc-button qc-primary" data-trash ${previewBatch?!current.length?'disabled':'':!selectable(f)?'disabled':''}>${previewBatch?'Trash selected':'Move to Trash'}</button></div>`;
+  dialog.innerHTML=`<div class="qc-preview-top"><div class="qc-preview-category" data-bucket="${category.id}" aria-label="AI suggestion: ${category.label}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1c1.4 6.3 4.7 9.6 11 11-6.3 1.4-9.6 4.7-11 11C10.6 16.7 7.3 13.4 1 12 7.3 10.6 10.6 7.3 12 1Z"/></svg><span>AI · ${category.label}</span></div><button type="button" class="qc-icon" data-close aria-label="Close preview">×</button></div>
+   <div class="qc-preview-stage"><button type="button" class="qc-preview-nav qc-preview-nav-prev" data-prev aria-label="Previous preview" ${previewIndex===0?'disabled':''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H4m7-7-7 7 7 7"/></svg></button><div class="qc-preview-art">${fileArt(f)}</div><button type="button" class="qc-preview-nav qc-preview-nav-next" data-next aria-label="Next preview" ${previewIndex>=previewIds.length-1?'disabled':''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-7-7 7 7-7 7"/></svg></button></div>
+   <div class="qc-preview-caption"><div><h2 id="qc-preview-name" tabindex="-1">${esc(f.file)}</h2><p>${esc(f.app||f.ext)} <span>·</span> ${esc(prettySize(f))} <span>·</span> ${esc(f.modified||'')}</p></div></div>
+   <div class="qc-preview-insight">${recommendationDetails(f,{showBadge:false})}<p class="qc-reason-hint">Click a tag to see the reasoning.</p></div>
+   <div class="qc-preview-actions"><button type="button" class="qc-button" data-archive>Archive</button><button type="button" class="qc-button qc-primary" data-trash>Move to Trash</button><label class="qc-preview-select" title="Select this file"><input type="checkbox" data-preview-select aria-label="Select ${esc(f.file)}"><span class="qc-preview-checkmark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></span></label></div><span class="qc-preview-position sr-only" role="status" aria-live="polite" aria-atomic="true"></span>`;
   hydrateArt?.(dialog.querySelector('.qc-preview-art'),f);
   dialog.querySelector('[data-close]').onclick=()=>dialog.close();
-  dialog.querySelector('[data-prev]').onclick=()=>{if(previewIndex>0){previewIndex--;renderPreview();}};
-  dialog.querySelector('[data-next]').onclick=()=>{if(previewIndex<previewIds.length-1){previewIndex++;renderPreview();}};
-  dialog.querySelector('[data-preview-select]').onchange=e=>{setSelected(f.id,e.target.checked);renderPreview();};
-  dialog.querySelector('[data-archive]').onclick=()=>takeAction(previewBatch?choiceFiles().map(x=>x.id):[f.id],'archive');
-  dialog.querySelector('[data-trash]').onclick=()=>takeAction(previewBatch?choiceFiles().map(x=>x.id):[f.id],'trash');
+  dialog.querySelector('[data-prev]').onclick=()=>movePreview(-1);
+  dialog.querySelector('[data-next]').onclick=()=>movePreview(1);
+  dialog.querySelector('[data-preview-select]').onchange=e=>{setSelected(f.id,e.target.checked);updatePreviewActions();};
+  dialog.querySelector('[data-archive]').onclick=()=>takeAction([f.id],'archive');
+  dialog.querySelector('[data-trash]').onclick=()=>takeAction(previewTrashTargets(getFiles(),f.id,choiceFiles().map(item=>item.id)).ids,'trash');
+  updatePreviewActions();
+  if(focusTarget){const target=dialog.querySelector(focusTarget);(target&&!target.disabled?target:dialog.querySelector('#qc-preview-name'))?.focus({preventScroll:true});}
  }
  function updateSelection(){
   const shown=visible().filter(selectable),chosen=choiceFiles();

@@ -3,7 +3,7 @@ import {formatStorage} from './data.js';
 const NS='http://www.w3.org/2000/svg',TAU=Math.PI*2,CX=500,CY=288,R=214,W=72;
 const colors={keep:['#92b9aa','#c1d8cc','#a3c5b6'],archive:['#ad94c6','#d1bfe1','#b9a3d0'],trash:['#ca8da5','#dfadc0','#d69cb3'],undecided:['#98a9c8','#c7d1e5','#acbbd7']};
 const safe=n=>Number.isFinite(n)&&n>0?n:0;
-const muted=color=>'#'+[1,3,5].map((offset,i)=>Math.round(parseInt(color.slice(offset,offset+2),16)*.4+[249,247,250][i]*.6).toString(16).padStart(2,'0')).join('');
+const muted=color=>'#'+[1,3,5].map((offset,i)=>Math.round(parseInt(color.slice(offset,offset+2),16)*.18+[249,247,250][i]*.82).toString(16).padStart(2,'0')).join('');
 const point=(radius,angle)=>[CX+radius*Math.cos(angle),CY+radius*Math.sin(angle)];
 const p=xy=>xy.map(n=>Number(n.toFixed(4))).join(' ');
 function arc(radius,start,end,sweep=1){
@@ -94,8 +94,8 @@ export function createRibbonRing({root,onSelect=()=>{}}){
    const fill=`url(#${uid}-${g.id}${state.selected&&!selected?'-muted':''})`;n.path.setAttribute('fill',fill);n.cap.setAttribute('fill',fill);
    n.labelPath.setAttribute('d',g.labelPath);n.textPath.textContent=g.label;n.textPath.setAttribute('startOffset',g.reverse?'0%':'100%');n.text.setAttribute('text-anchor',g.reverse?'start':'end');n.text.setAttribute('font-size',g.fontSize);n.label.style.display=g.labelFits?'':'none';
    n.arrow.setAttribute('transform',`translate(${g.headX} ${g.headY}) rotate(${g.arrowRotation})`);
-   n.path.setAttribute('aria-label',`${g.label}, ${g.count} files. ${selected?'Click to show all files.':'Click to view files.'}`);n.path.setAttribute('aria-pressed',String(selected));
-   n.title.textContent=`${g.label} · ${selected?'Click to show all files':'Click to view files'}`;
+   n.path.setAttribute('aria-label',`${g.label}, ${g.count} files. ${selected?'Selected. Scroll to view files.':'Click to view files.'}`);n.path.setAttribute('aria-pressed',String(selected));
+   n.title.textContent=`${g.label} · ${selected?'Selected · Scroll to view files':'Click to view files'}`;
    [n.path,n.head,n.label,n.fallback].forEach(el=>{el.classList.toggle('is-muted',!!state.selected&&!selected);el.classList.toggle('is-selected',selected);});
    n.fallback.hidden=g.labelFits||!g.count;n.fallback.textContent=g.label;n.fallback.setAttribute('aria-pressed',String(selected));if(!n.fallback.hidden)small++;
   });

@@ -17,6 +17,7 @@ export function createQuickMode({root,getFiles,getState,thumb,badge,fileArt,hydr
   const loading=phase==='overview'||phase==='scanning',ready=phase==='ready';
   root.setAttribute('aria-busy',String(!ready));
   if($('.qc-overview'))$('.qc-overview').inert=loading;
+  if($('.qc-scroll-cue'))$('.qc-scroll-cue').disabled=!ready;
   if($('.qc-results')){$('.qc-results').inert=!ready;$('.qc-results').setAttribute('aria-hidden',String(!ready));}
   if($('.qc-selection-bar')){$('.qc-selection-bar').inert=!ready;$('.qc-selection-bar').setAttribute('aria-hidden',String(!ready));}
   root.querySelectorAll('.qc-final-value,.qc-final-meta').forEach(el=>{if(loading)el.setAttribute('aria-hidden','true');else el.removeAttribute('aria-hidden');});
@@ -107,12 +108,11 @@ export function createQuickMode({root,getFiles,getState,thumb,badge,fileArt,hydr
   const data=overviewData(),active=data.groups.find(b=>b.id===bucket);
   ringUI?.update({...data,selected:bucket,metric,phase:root.dataset.phase||'ready'});
   $('.qc-summary').dataset.bucket=bucket;
-  $('.qc-summary-copy').innerHTML=active?`<span class="qc-summary-category">${esc(active.label)}</span><div class="qc-summary-values"><span class="qc-final-meta qc-summary-percent">${(active.share*100).toFixed(1)}%</span><strong class="qc-summary-storage">${number(esc(formatStorage(active.size)))}</strong><span class="qc-final-meta">${active.count} ${active.count===1?'file':'files'}</span></div>`:`<strong>${number(esc(formatStorage(data.potential)))}</strong><span>potential to clear</span>`;
-  $('.qc-orbit-reset').hidden=!bucket;
+  $('.qc-summary-copy').innerHTML=active?`<div class="qc-summary-values" aria-label="${esc(active.label)}"><span class="qc-final-meta qc-summary-percent">${(active.share*100).toFixed(1)}%</span><strong class="qc-summary-storage">${number(esc(formatStorage(active.size)))}</strong><span class="qc-final-meta">${active.count} ${active.count===1?'file':'files'}</span></div>`:`<strong>${number(esc(formatStorage(data.potential)))}</strong><span>potential to clear</span>`;
   const suggested=$('[data-qc-suggested]');suggested.disabled=!data.pendingTrash.length;suggested.hidden=!!bucket&&bucket!=='trash';suggested.innerHTML=`Select suggested Trash <span class="qc-final-meta">(${data.pendingTrash.length})</span><span aria-hidden="true">↘</span>`;
   root.querySelectorAll('[data-qc-metric]').forEach(b=>b.setAttribute('aria-pressed',String(metric===b.dataset.qcMetric)));
  }
- function selectBucket(id){bucket=bucket===id?'':id;updateOverview();renderRows();}
+ function selectBucket(id){if(bucket===id)return;bucket=id;updateOverview();renderRows();}
  function clearFilters(){bucket='';query='';$('#qc-search-input').value='';updateOverview();renderRows();}
  function render({enter=false}={}){
   const previousProject=project;
@@ -124,7 +124,7 @@ export function createQuickMode({root,getFiles,getState,thumb,badge,fileArt,hydr
    <div class="qc-metric" role="group" aria-label="Measure storage or file count"><button type="button" data-qc-metric="space" aria-pressed="${metric==='space'}">Storage</button><button type="button" data-qc-metric="files" aria-pressed="${metric==='files'}">Files</button></div>
    <div class="qc-orbit"></div>
    <div class="qc-scan-caption" aria-hidden="true"><span class="qc-scan-file">Preparing overview</span><span class="qc-scan-count"></span></div>
-   <div class="qc-summary" role="status" aria-live="polite" aria-atomic="true"><div class="qc-summary-copy"></div><button class="qc-orbit-reset" type="button" hidden>All files <span aria-hidden="true">↺</span></button></div>
+   <div class="qc-summary"><div class="qc-summary-copy" role="status" aria-live="polite" aria-atomic="true"></div><button class="qc-scroll-cue" type="button">Scroll to view files <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v13M5 11l5 5 5-5"/></svg></button></div>
   </div>
   <span class="sr-only qc-loading-status" role="status" aria-live="polite"></span><div class="qc-results"><div class="qc-results-inner"><div class="qc-list-toolbar"><div class="qc-list-heading"><h2>${bucket?esc(BUCKETS.find(b=>b.id===bucket).label):'Ready to review'}</h2><span class="qc-list-count"></span><button type="button" class="qc-filter-clear">Clear filter ×</button></div><div class="qc-list-tools"><button type="button" class="qc-button qc-soft" data-qc-suggested></button><form class="qc-search" role="search"><label class="sr-only" for="qc-search-input">Search project files</label><input id="qc-search-input" type="search" placeholder="Find a file…" value="${esc(query)}"><button type="submit" aria-label="Search project files">↗</button></form></div></div>
   <div class="qc-table" role="group" aria-label="Files by cleanup priority"><div class="qc-table-head"><input type="checkbox" data-qc-all aria-label="Select all visible files"><span>Priority</span><span>File</span><span>AI suggestion</span><span>Size</span><span>Modified</span><span></span></div><div class="qc-list-body"></div></div>
@@ -132,7 +132,7 @@ export function createQuickMode({root,getFiles,getState,thumb,badge,fileArt,hydr
   ringUI=createRibbonRing({root:$('.qc-orbit'),onSelect:selectBucket});
   updateOverview();
   root.querySelectorAll('[data-qc-metric]').forEach(b=>b.onclick=()=>{metric=b.dataset.qcMetric;updateOverview();});
-  $('.qc-orbit-reset').onclick=()=>{bucket='';updateOverview();renderRows();};
+  $('.qc-scroll-cue').onclick=()=>{const heading=$('.qc-list-heading h2');heading.setAttribute('tabindex','-1');heading.focus({preventScroll:true});$('.qc-list-toolbar').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});};
   $('[data-qc-suggested]').onclick=()=>{selected=new Set(overviewData().pendingTrash.map(f=>f.id));updateSelection();$('.qc-selection-bar').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'nearest'});};
   $('.qc-search').onsubmit=e=>{e.preventDefault();query=$('#qc-search-input').value.trim();renderRows();};
   $('.qc-filter-clear').onclick=clearFilters;

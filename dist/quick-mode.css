@@ -61,6 +61,7 @@
 .qc-table{width:100%}
 .qc-table-head,.qc-row{display:grid;grid-template-columns:20px minmax(290px,360px) minmax(290px,1fr) 70px 94px;align-items:center;gap:20px}
 .qc-table-head{padding:12px 18px;border-bottom:1px solid #e2dae7;color:#9a86a2;font-size:11px}
+.qc-reasons-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:3px 10px}.qc-reasons-hint{font-size:11px;font-weight:400;color:#876d95;line-height:1.5}
 .qc-table input[type=checkbox],.qc-preview-dialog input[type=checkbox]{appearance:auto;accent-color:#8c577d;width:16px;height:16px;margin:0;cursor:pointer}
 .qc-table input[type=checkbox]:disabled{cursor:default;opacity:.35}
 .qc-row{--qc-ink:#7288aa;--qc-tint:#e0e7f0;padding:16px 18px;min-height:109px;border-bottom:1px solid #e8e1eb;background:linear-gradient(90deg,var(--qc-tint),color-mix(in srgb,var(--qc-tint) 36%,#f8f7f8) 100px,#f8f7f820 210px,transparent 300px);transition:box-shadow .2s}
@@ -147,3 +148,7 @@
 
 @media(max-width:760px){.qc-list-tools{gap:9px}.qc-summary-copy{font-size:14px}.qc-summary-values{gap:9px}.qc-summary-values > * + *:before{padding-right:9px}.qc-summary-copy strong{font-size:25px}.qc-overview{margin-bottom:22px}}
 @media(max-width:590px){.qc-list-tools{width:100%;flex-wrap:wrap;justify-content:space-between}.qc-list-tools .qc-search{flex:1;min-width:160px}.qc-list-tools>[data-qc-suggested]{font-size:11px}.qc-summary{gap:5px}.qc-summary-copy{font-size:13px;gap:7px}.qc-summary-values{gap:8px}.qc-summary-values > * + *:before{padding-right:8px}.qc-summary-copy strong{font-size:22px}.qc-overview{width:100%;margin-bottom:10px}.qc-metric button{min-height:36px}}
+
+/* Keep the explanation affordance visible with the compact table layout. */
+@media(max-width:760px){.qc-table-head .qc-reasons-heading{display:flex;grid-column:2/-1;grid-row:2}.qc-table-head .qc-size-heading{grid-column:3;grid-row:1}}
+.qc-preview-complete{min-height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:15px;padding:35px 20px;text-align:center}.qc-preview-complete h2{margin:0;font-family:"FILEO Grotesk",sans-serif;font-size:26px;font-weight:500;color:#594263}.qc-preview-complete p{margin:0;max-width:320px;color:#907a9b;line-height:1.6}.qc-preview-complete-mark{display:grid;place-items:center;width:64px;height:64px;border-radius:50%;background:linear-gradient(140deg,#f2dfed,#e3def5);color:#85658f;font-size:30px}.qc-preview-complete-mark svg{width:30px;height:30px}

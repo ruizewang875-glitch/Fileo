@@ -3,7 +3,7 @@ import {BUCKETS, formatStorage, searchFiles} from './data.js';
 import {rankFiles} from './mode-model.js';
 import {createRibbonRing} from './bubble-ring.js';
 import {createOverviewSequence} from './quick-loading.js';
-import {createPreviewQueue,previewTrashTargets} from './quick-preview-model.js';
+import {createPreviewQueue,previewTrashTargets,previewAfterTrash} from './quick-preview-model.js';
 
 // Quick Clear deliberately exposes a preview, not the detailed decision workspace.
 export function createQuickMode({root,getFiles,getState,thumb,fileArt,hydrateArt,prettySize,escapeHtml:esc,onDecide}) {
@@ -30,7 +30,6 @@ export function createQuickMode({root,getFiles,getState,thumb,fileArt,hydrateArt
  }});
  const dialog=document.createElement('dialog');
  dialog.className='qc-preview-dialog';dialog.setAttribute('aria-labelledby','qc-preview-name');document.body.append(dialog);
- dialog.addEventListener('click',e=>{if(e.target!==dialog)return;const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();});
  dialog.addEventListener('keydown',e=>{if(/TEXTAREA|SELECT/.test(e.target.tagName)||(e.target.tagName==='INPUT'&&e.target.type!=='checkbox')||e.target.closest('.rec-popover'))return;if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();movePreview(e.key==='ArrowLeft'?-1:1);}});
  const files=()=>rankFiles(getFiles());
  const selectable=f=>f.decision!=='trash';
@@ -44,7 +43,17 @@ export function createQuickMode({root,getFiles,getState,thumb,fileArt,hydrateArt
  function setSelected(id,checked){if(checked)selected.add(id);else selected.delete(id);updateSelection();}
  function takeAction(ids,decision){
   const valid=new Set(getFiles().filter(selectable).map(f=>f.id));const chosen=[...new Set(ids)].filter(id=>valid.has(id));
-  if(!chosen.length)return;if(dialog.open)dialog.close();onDecide(chosen,decision);
+  if(!chosen.length)return;
+  if(dialog.open&&decision==='trash'&&chosen.length===1){
+   // Keep the preview underneath confirmation. Cancel leaves this file in place;
+   // only a successful decision advances the original, scoped browsing queue.
+   const currentId=previewIds[previewIndex];
+   onDecide(chosen,decision,{preservePreview:true,onApplied(){
+    const next=previewAfterTrash(previewIds,currentId,getFiles());previewIds=next.ids;previewIndex=next.index;
+    if(dialog.open)renderPreview({focusTarget:'#qc-preview-name'});
+   }});return;
+  }
+  if(dialog.open)dialog.close();onDecide(chosen,decision);
  }
  function openPreview(ids,batch=false){
   const valid=new Set(ids),scope=batch?files().filter(f=>valid.has(f.id)&&selectable(f)):visible();
@@ -70,7 +79,12 @@ export function createQuickMode({root,getFiles,getState,thumb,fileArt,hydrateArt
   const live=dialog.querySelector('.qc-preview-position');if(live)live.textContent='File '+(previewIndex+1)+' of '+previewIds.length+'. '+f.file+'. '+current.length+' '+(current.length===1?'file':'files')+' selected.';
  }
  function renderPreview({focusTarget=null}={}){
-  const all=files(),f=all.find(item=>item.id===previewIds[previewIndex]);if(!f){dialog.close();return;}
+  const all=files(),f=all.find(item=>item.id===previewIds[previewIndex]);if(!f){
+   delete dialog.dataset.fileId;
+   dialog.innerHTML=`<div class="qc-preview-top"><span></span><button type="button" class="qc-icon" data-close aria-label="Close preview">×</button></div><div class="qc-preview-complete"><span class="qc-preview-complete-mark" aria-hidden="true">✓</span><h2 id="qc-preview-name" tabindex="-1">You're all done here.</h2><p>No more files in this preview.</p></div>`;
+   dialog.querySelector('[data-close]').onclick=()=>dialog.close();
+   dialog.querySelector('#qc-preview-name').focus({preventScroll:true});return;
+  }
   const category=BUCKETS.find(item=>item.id===f.bucket)||BUCKETS.find(item=>item.id==='undecided');
   dialog.dataset.fileId=f.id;
   dialog.innerHTML=`<div class="qc-preview-top"><div class="qc-preview-category" data-bucket="${category.id}" aria-label="AI suggestion: ${category.label}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1c1.4 6.3 4.7 9.6 11 11-6.3 1.4-9.6 4.7-11 11C10.6 16.7 7.3 13.4 1 12 7.3 10.6 10.6 7.3 12 1Z"/></svg><span>AI · ${category.label}</span></div><button type="button" class="qc-icon" data-close aria-label="Close preview">×</button></div>
@@ -145,7 +159,7 @@ export function createQuickMode({root,getFiles,getState,thumb,fileArt,hydrateArt
    <div class="qc-summary"><div class="qc-summary-copy" role="status" aria-live="polite" aria-atomic="true"></div><button class="qc-scroll-cue" type="button">Scroll to view files <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v13M5 11l5 5 5-5"/></svg></button></div>
   </div>
   <span class="sr-only qc-loading-status" role="status" aria-live="polite"></span><div class="qc-results"><div class="qc-results-inner"><div class="qc-list-toolbar"><div class="qc-list-heading"><h2>${bucket?esc(BUCKETS.find(b=>b.id===bucket).label):'Ready to review'}</h2><span class="qc-list-count"></span><button type="button" class="qc-filter-clear">Clear filter ×</button></div><div class="qc-list-tools"><button type="button" class="qc-button qc-soft" data-qc-suggested></button><form class="qc-search" role="search"><label class="sr-only" for="qc-search-input">Search project files</label><input id="qc-search-input" type="search" placeholder="Find a file…" value="${esc(query)}"><button type="submit" aria-label="Search project files">↗</button></form></div></div>
-  <div class="qc-table" role="group" aria-label="Files by cleanup priority"><div class="qc-table-head"><input type="checkbox" data-qc-all aria-label="Select all visible files"><span>File</span><span class="qc-reasons-heading">AI reasoning</span><span class="qc-size-heading">Size</span><span class="qc-modified-heading">Modified</span></div><div class="qc-list-body"></div></div>
+  <div class="qc-table" role="group" aria-label="Files by cleanup priority"><div class="qc-table-head"><input type="checkbox" data-qc-all aria-label="Select all visible files"><span>File</span><span class="qc-reasons-heading">AI reasoning <span class="qc-reasons-hint">Click a tag for details</span></span><span class="qc-size-heading">Size</span><span class="qc-modified-heading">Modified</span></div><div class="qc-list-body"></div></div>
   </div></div><div class="qc-selection-bar" hidden><div><strong class="qc-selection-total" aria-live="polite"></strong><span class="qc-selection-size"></span></div><button type="button" class="qc-selection-clear" aria-label="Clear selection">×</button><span class="qc-selection-divider" aria-hidden="true"></span><button type="button" class="qc-button" data-qc-check>Preview selection <span aria-hidden="true">↗</span></button><button type="button" class="qc-button" data-qc-archive>Archive</button><button type="button" class="qc-button qc-primary" data-qc-trash>Move to Trash</button></div>`;
   ringUI=createRibbonRing({root:$('.qc-orbit'),onSelect:selectBucket});
   updateOverview();

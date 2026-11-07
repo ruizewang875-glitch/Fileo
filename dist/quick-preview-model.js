@@ -15,3 +15,14 @@ export function previewTrashTargets(files,currentId,selectedIds){
  if(selected.length>=2)return {ids:selected,batch:true};
  return {ids:valid.has(currentId)?[currentId]:[],batch:false};
 }
+
+// Continue within the snapshot the user opened, never the newly ranked list.
+// Prefer the following remaining file; at the end, use the nearest previous one.
+export function previewAfterTrash(queueIds,currentId,files){
+ const valid=new Set((Array.isArray(files)?files:[]).filter(file=>file?.decision!=='trash').map(file=>file?.id));
+ const queue=[...new Set(queueIds||[])],ids=queue.filter(id=>valid.has(id));
+ if(!ids.length)return {ids:[],index:0};
+ const oldIndex=queue.indexOf(currentId);
+ const nextId=queue.slice(oldIndex+1).find(id=>valid.has(id))||[...queue.slice(0,Math.max(oldIndex,0))].reverse().find(id=>valid.has(id))||ids[0];
+ return {ids,index:ids.indexOf(nextId)};
+}

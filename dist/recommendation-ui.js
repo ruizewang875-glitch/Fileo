@@ -1,3 +1,4 @@
+import {feedbackControl} from './suggestion-feedback.js';
 const choices={keep:'Keep',archive:'Archive',trash:'Trash',undecided:'Undecided'};
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key=file=>Object.hasOwn(choices,file?.bucket)?file.bucket:'undecided';
@@ -21,8 +22,9 @@ export function suggestionBadge(file,{interactive=false,variant='badge'}={}){
  if(!interactive)return '<span class="ai-badge rec-static-badge" data-bucket="'+bucket+'" aria-label="AI suggestion: '+label+'">'+copy+'</span>';
  return '<button type="button" class="ai-badge rec-badge" data-bucket="'+bucket+'" data-rec-file="'+escape(file.id)+'" aria-label="Why AI suggests '+label+' for '+escape(file.file)+'" aria-expanded="false" aria-haspopup="dialog">'+copy+info+'</button>';
 }
-export function recommendationDetails(file,{showBadge=true}={}){
- return '<section class="rec-evidence" aria-label="Recommendation evidence">'+(showBadge?suggestionBadge(file):'')+recommendationTags(file)+'</section>';
+export function recommendationDetails(file,{showBadge=true,showFeedback=false}={}){
+ const category=showBadge?suggestionBadge(file):'';
+ return '<section class="rec-evidence" aria-label="Recommendation evidence">'+(showFeedback?'<div class="suggestion-with-feedback">'+category+feedbackControl(file)+'</div>':category)+recommendationTags(file)+'</section>';
 }
 // One delegated listener also covers filtered lists, preview dialogs and comparisons.
 export function installSuggestionPopovers({getFile}){

@@ -3,6 +3,7 @@ import {art} from './art.js';
 import {demoPreview} from './demo-preview.js';
 import {fileCover} from './document-previews.js';
 import {installSuggestionPopovers,recommendationDetails,suggestionBadge} from './recommendation-ui.js';
+import {installSuggestionFeedback} from './suggestion-feedback.js';
 import {createProjectPreferencesUI} from './project-preferences-ui.js';
 import {createPrivacyUI} from './privacy-ui.js';
 import {PRIVACY_VERSION, PRIVACY_TYPES, isReadingAllowed} from './privacy.js';
@@ -274,7 +275,7 @@ function startAnalysis(){
  },600);
 }
 $('#pause-analysis').onclick=()=>{analysisPaused=true;clearTimeout(analysisTimer);navigate({page:'import'});};
-function recommendation(f){return recommendationDetails(f,{showBadge:true});}
+function recommendation(f){return recommendationDetails(f,{showBadge:true,showFeedback:true});}
 function buttons(f){return ['keep','archive','trash','undecided'].map(d=>`<button class="decision-button ${f.decision===d?'is-selected':''}" data-decision="${d}" aria-label="${d==='undecided'?'Clarify':d[0].toUpperCase()+d.slice(1)} ${esc(f.file)}">${icon(d)}<span>${d==='undecided'?'Clarify':d[0].toUpperCase()+d.slice(1)}</span></button>`).join('');}
 function bindDecisions(container,id,advance){container.querySelectorAll('button.decision-button[data-decision]').forEach(b=>b.onclick=()=>chooseDecision(id,b.dataset.decision,advance));}
 function activeReviewFile(){const r=state().review;return currentFiles().find(f=>f.id===r.ids[r.cursor]);}
@@ -340,6 +341,12 @@ function batchDecision(ids,decision,{preservePreview=false,onApplied}={}){
 async function openSourceFile(id){const f=currentFiles().find(f=>f.id===id);if(!f)return;if(f.source==='demo'){notify('Demo preview only. Add an original file to open it.');return;}const result=await openOriginal(id,f);if(!result.ok){originalRepairId=id;notify('Select the original file to reconnect it.');$('#file-input').click();}else if(result.kind==='download')notify(`Downloaded — open with ${f.app}.`);}
 const quickUI=createQuickMode({root:$('#quick-view'),getFiles:currentFiles,getState:state,thumb,badge,fileArt,hydrateArt,prettySize,escapeHtml:esc,onDecide:batchDecision});
 const exploreUI=createExploreMode({root:$('#browse-view'),getFiles:currentFiles,getState:state,thumb,badge,fileArt,hydrateArt,prettySize,escapeHtml:esc,onDecide:batchDecision,onReview:(ids,focus,filters)=>beginReview(ids,focus,hash({...route,...filters})),onOpenFile:openSourceFile,onBack:()=>navigate({page:'explore'}),onSave:id=>{ws.toggleSaved(id);refreshCurrent();}});
+const feedbackUI=installSuggestionFeedback({
+ getFile:id=>currentFiles().find(f=>f.id===id),
+ onRate:(id,rating)=>ws.setSuggestionFeedback(id,{rating}),
+ onCorrect:(id,correctedBucket)=>ws.setSuggestionFeedback(id,{rating:'bad',correctedBucket}),
+ onApplied:()=>{suggestionPopovers.close();refreshCurrent();quickUI.refreshPreview();if($('#preview-dialog').open)updatePreview();}
+});
 $('#toast-undo').onclick=()=>undo(toastEvent);$('#toast-close').onclick=()=>$('#toast').hidden=true;
 $('#account-button').onclick=()=>{if(!state().session.signedIn)return openLogin({page:'home'});const p=state().session;$('#account-name').textContent=p.name;$('#account-email').textContent=p.email||'Prototype workspace';$('#account-avatar').textContent=$('#header-avatar').textContent;$('#display-name').value=p.name;$('#account-sort').value=p.sort;$('#account-autoplay').checked=p.autoplay;$('#account-save-status').textContent='';prefUI.syncAccount(p.project);syncPrivacyEntry();$('#account-panel').showModal();};$('#account-close').onclick=()=>$('#account-panel').close();$('#account-form').onsubmit=e=>{e.preventDefault();const name=$('#display-name').value.trim();if(!name)return;ws.updateProfile({name,sort:$('#account-sort').value,autoplay:$('#account-autoplay').checked});sort=state().session.sort;carousel.setAutoplay(state().session.autoplay);$('#account-name').textContent=name;$('#account-save-status').textContent='Saved';refreshCurrent();};$('#logout-button').onclick=()=>{closeDialogs();ws.logout();navigate({page:'home'});$('#toast').hidden=true;};
 $('#assistant-button').onclick=()=>{if(!guard(modeHome()))return;$('#assistant-panel').showModal();};$('#assistant-close').onclick=()=>$('#assistant-panel').close();$('#assistant-form').onsubmit=e=>{e.preventDefault();navigate({page:'browse',q:$('#assistant-query').value.trim()});};$$('[data-assistant-query]').forEach(b=>b.onclick=()=>navigate({page:'browse',q:b.dataset.assistantQuery}));$$('[data-assistant-view]').forEach(b=>b.onclick=()=>navigate({page:'browse',view:b.dataset.assistantView}));

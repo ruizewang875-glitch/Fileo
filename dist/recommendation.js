@@ -5,6 +5,16 @@ export const PREFERENCE_PRESETS = Object.freeze([
  'Free up space','Keep final work','Preserve drafts','Protect memories','Keep references'
 ]);
 const validBuckets=new Set(['keep','archive','trash','undecided']);
+export function normalizeSuggestionFeedback(value,now=Date.now()){
+ if(!value||typeof value!=='object'||Array.isArray(value)||!['good','bad'].includes(value.rating)||!Number.isFinite(value.at)||value.at<0||value.at>now)return null;
+ const feedback={rating:value.rating,at:value.at};
+ if(validBuckets.has(value.correctedBucket)){
+  feedback.correctedBucket=value.correctedBucket;
+  feedback.correctedAt=Number.isFinite(value.correctedAt)&&value.correctedAt>=0&&value.correctedAt<=value.at?value.correctedAt:value.at;
+  if(validBuckets.has(value.correctedFrom))feedback.correctedFrom=value.correctedFrom;
+ }
+ return feedback;
+}
 const DAY=86400000;
 const lower=v=>String(v||'').normalize('NFKC').trim().toLowerCase();
 const words=v=>lower(v).replace(/[^\p{L}\p{N}]+/gu,' ').trim();
@@ -75,9 +85,39 @@ function matchGoal(tags,f,c,base){
  if(free&&base==='undecided'&&f.size>=25&&c.age!==null&&c.age>=180)return {tag:free,outcome:'archive',explanation:'this '+sizeLabel(f.size)+' file was last edited on '+c.day+'; move it out of the active set while retaining it'};
  return null;
 }
+function correctedRecommendation(f,feedback,{files,now,privacy,readAccess}){
+ const bucket=feedback.correctedBucket,labels={keep:'Keep',archive:'Archive',trash:'Trash',undecided:'Undecided'};
+ const correction='You '+(feedback.correctedFrom&&feedback.correctedFrom!==bucket?'changed the suggestion from '+labels[feedback.correctedFrom]+' to ':'set the suggestion to ')+labels[bucket]+'. Your correction takes priority over the earlier suggestion.';
+ const intent={
+  keep:['Keep active','This file belongs with your active work. Changing the suggestion does not archive or delete it.'],
+  archive:['Save for later','Retain this file for later outside active work. Choose Archive to move it there; this feedback only changes the suggestion.'],
+  trash:['Cleanup candidate','Review this file as a cleanup candidate. Choose Move to Trash to move it to the recycle bin; this feedback has not deleted it.'],
+  undecided:['Needs your context','Leave this file open for further review until you have enough context. No file action has been applied.']
+ }[bucket];
+ const reasonSignals=[{tag:'Your correction',explanation:correction},{tag:intent[0],explanation:intent[1]}];
+ const blocked=readAccess&&['pending','disabled'].includes(readAccess.status);
+ if(blocked){
+  reasonSignals[0].explanation+=' AI reading remains '+(readAccess.status==='disabled'?'off for this file type.':'unapproved for this file type.')+' Only your explicit correction is used here.';
+ }else{
+  // Only add a neutral, existing fact; old cleanup/preservation advice must not
+  // contradict a user correction, and feedback never triggers a new content read.
+  const peers=privacy===undefined?(Array.isArray(files)?files:[]):(Array.isArray(files)?files:[]).filter(peer=>isReadingAllowed(peer,privacy));
+  const c=contextOf(f,peers,now);let fact=null;
+  if(bucket==='trash'&&c.exact)fact={tag:'Matching preview',explanation:'Its preview matches “'+c.exact.file+'”. Editable source data may still differ.'};
+  else if(bucket==='trash'&&c.isCopy)fact={tag:'Copy in filename',explanation:'The filename “'+c.filename+'” contains a copy or backup marker. A filename alone does not establish that the file is redundant.'};
+  else if(bucket==='keep'&&c.final)fact={tag:'Final in filename',explanation:'The filename “'+c.filename+'” marks a final, approved or completed version. This provides context for keeping it, although the name does not verify approval.'};
+  else if(bucket==='undecided'&&c.variant)fact={tag:'Distinct version',explanation:'Its preview differs from “'+c.variant.file+'” in the same visual series. That difference is a reason to compare the versions before deciding.'};
+  else if(c.day)fact={tag:dateTag(c.day),explanation:'The recorded modified date is '+c.day+'. It helps place the file in the project timeline; it does not show when the file was last opened.'};
+  else if(Number.isFinite(f.size))fact={tag:'File size',explanation:'The file is listed at '+sizeLabel(f.size)+'. Size alone does not establish usefulness or redundancy.'};
+  if(fact)reasonSignals.push(fact);
+ }
+ return {bucket,reason:reasonSignals.map(signal=>signal.explanation).join(' '),tags:reasonSignals.map(signal=>signal.tag),reasonSignals,...(readAccess?{readAccess}:{})};
+}
 export function assessRecommendation(file,{files=[],tags=[],now=Date.now(),privacy}={}){
  const f=file||{};
  const readAccess=privacy===undefined?null:readAccessFor(f,privacy);
+ const feedback=normalizeSuggestionFeedback(f.suggestionFeedback,now);
+ if(feedback?.correctedBucket)return correctedRecommendation(f,feedback,{files,now,privacy,readAccess});
  if(readAccess&&['pending','disabled'].includes(readAccess.status)){
   const reason=readAccess.status==='pending'?'Choose which file types AI may read in Privacy & AI access. You can still review this file yourself.':'AI reading is off for this file type. No AI recommendation is generated. You can review and organize the file yourself, or change its permission in Privacy & AI access.';
   return {bucket:'undecided',reason,tags:[readAccess.label],reasonSignals:[{tag:readAccess.label,explanation:reason}],readAccess};

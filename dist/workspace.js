@@ -1,5 +1,5 @@
 import {FILES, typeForExtension} from './data.js';
-import {assessRecommendation, PREFERENCE_PRESETS} from './recommendation.js';
+import {assessRecommendation,normalizeSuggestionFeedback,PREFERENCE_PRESETS} from './recommendation.js';
 import {PRIVACY_VERSION,freshPrivacy,normalizePrivacy,isReadingAllowed} from './privacy.js';
 import {isActiveFile,isExpiredTrash} from './file-lifecycle.js';
 
@@ -109,6 +109,8 @@ function restoreState(raw,clock) {
  for (const f of raw.files) {
   if (!f || typeof f.id!=='string' || purgedDemoIds.has(f.id) || seen.has(f.id) || typeof f.file!=='string' || !BUCKETS.has(f.bucket) || !Number.isFinite(f.size) || f.size<0) continue;
   const record={...f,project:cleanText(f.project,300)||'Imported files',decision:DECISIONS.has(f.decision)?f.decision:'pending',clarification:safeClarification(f.clarification),revision:Number.isSafeInteger(f.revision)&&f.revision>=0?f.revision:0,source:f.source==='demo'?'demo':'local'};
+  const feedback=normalizeSuggestionFeedback(f.suggestionFeedback,clock);
+  delete record.suggestionFeedback;if(feedback)record.suggestionFeedback=feedback;
   if(record.source==='local'){
    delete record.image;
    const type=typeForExtension(record.ext);
@@ -345,6 +347,19 @@ export function createWorkspace(options={}) {
   },
   setAnalysisStep(step){if(state.analysis.status!=='pending')return;state.analysis.step=Math.max(0,Math.min(3,Number.isFinite(Number(step))?Math.floor(Number(step)):0));persist();},
   finishAnalysis(){if(state.analysis.status==='idle')return;state.analysis.status='done';state.analysis.step=3;chooseNext();persist();},
+  setSuggestionFeedback(id,value){
+   if(typeof id!=='string'||!value||typeof value!=='object'||Array.isArray(value)||!['good','bad'].includes(value.rating))return null;
+   const hasCorrection=Object.hasOwn(value,'correctedBucket');
+   if(hasCorrection&&(value.rating!=='bad'||!BUCKETS.has(value.correctedBucket)))return null;
+   const file=state.files.find(file=>file.id===id&&file.project===state.session.project&&isActiveFile(file));
+   if(!file)return null;
+   const clock=timestamp(),previous=normalizeSuggestionFeedback(file.suggestionFeedback,clock);
+   // Feedback updates the recommendation, independently of file placement and
+   // its action revision. A subsequent rating keeps a confirmed correction.
+   file.suggestionFeedback={...(previous||{}),rating:value.rating,at:clock};
+   if(hasCorrection)Object.assign(file.suggestionFeedback,{correctedBucket:value.correctedBucket,correctedAt:clock,correctedFrom:file.bucket});
+   if(hasCorrection)refreshRecommendations(state,clock,new Set([file.project]));persist();return clone(file);
+  },
   decide(ids,decision,clarification=null){
    purgeExpiredTrash();
    if(!DECISIONS.has(decision))return null;

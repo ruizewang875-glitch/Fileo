@@ -55,6 +55,8 @@ The welcome page introduces the purpose of FILEO. New projects offer an optional
 
 Suggestions use deterministic local rules; no model API is connected. Demo evidence is authored from the actual example artwork. Local recommendations use file metadata and project preferences. A suspected copy is not verified by comparing bytes. Comparison surfaces previews, dates, sizes and recommendations for the user to assess.
 
+Preview, detail, review and comparison views include a feedback control beside the AI suggestion. Good suggestion saves a filled thumbs-up and shows a thank-you message. Bad suggestion saves a thumbs-down and opens a Clarify dialog above the blurred preview. Choosing a category updates that file's suggestion and individually explained reason tags using the correction and available evidence. It does not move, delete or archive the file. Corrections and ratings persist on this browser, take precedence over project preference rules, and remain synchronized across both modes. This is local prototype behavior, not remote model training or an API re-analysis.
+
 All workspace data stays in this browser: metadata and decisions use localStorage (`fileo-workspace-v2`), while image previews and eligible originals use IndexedDB. Clearing browser data removes the workspace. Keep leaves a file in the active workspace. Archive removes it from browsing and preview until restoration, without an expiry. Trash moves it into a 180-day Recycle bin. Expired records, stored originals and thumbnails are purged from FILEO. **Source files are never modified or deleted from disk**. “Potential to clear” is an estimate, not a claim that physical disk space has been freed.
 
 ## Privacy and AI access

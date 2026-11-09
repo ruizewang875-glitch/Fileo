@@ -1,4 +1,5 @@
 import {recommendationDetails,recommendationTags} from './recommendation-ui.js';
+import {feedbackControl} from './suggestion-feedback.js';
 import {BUCKETS, formatStorage, searchFiles} from './data.js';
 import {rankFiles} from './mode-model.js';
 import {isActiveFile} from './file-lifecycle.js';
@@ -90,7 +91,7 @@ export function createQuickMode({root,getFiles,getState,thumb,fileArt,hydrateArt
   }
   const category=BUCKETS.find(item=>item.id===f.bucket)||BUCKETS.find(item=>item.id==='undecided');
   dialog.dataset.fileId=f.id;
-  dialog.innerHTML=`<div class="qc-preview-top"><div class="qc-preview-category" data-bucket="${category.id}" aria-label="AI suggestion: ${category.label}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1c1.4 6.3 4.7 9.6 11 11-6.3 1.4-9.6 4.7-11 11C10.6 16.7 7.3 13.4 1 12 7.3 10.6 10.6 7.3 12 1Z"/></svg><span>AI · ${category.label}</span></div><button type="button" class="qc-icon" data-close aria-label="Close preview">×</button></div>
+  dialog.innerHTML=`<div class="qc-preview-top"><div class="suggestion-with-feedback"><div class="qc-preview-category" data-bucket="${category.id}" aria-label="AI suggestion: ${category.label}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1c1.4 6.3 4.7 9.6 11 11-6.3 1.4-9.6 4.7-11 11C10.6 16.7 7.3 13.4 1 12 7.3 10.6 10.6 7.3 12 1Z"/></svg><span>AI · ${category.label}</span></div>${feedbackControl(f)}</div><button type="button" class="qc-icon" data-close aria-label="Close preview">×</button></div>
    <div class="qc-preview-stage"><button type="button" class="qc-preview-nav qc-preview-nav-prev" data-prev aria-label="Previous preview" ${previewIndex===0?'disabled':''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H4m7-7-7 7 7 7"/></svg></button><div class="qc-preview-art">${fileArt(f)}</div><button type="button" class="qc-preview-nav qc-preview-nav-next" data-next aria-label="Next preview" ${previewIndex>=previewIds.length-1?'disabled':''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-7-7 7 7-7 7"/></svg></button></div>
    <div class="qc-preview-caption"><div><h2 id="qc-preview-name" tabindex="-1">${esc(f.file)}</h2><p>${esc(f.app||f.ext)} <span>·</span> ${esc(prettySize(f))} <span>·</span> ${esc(f.modified||'')}</p></div></div>
    <div class="qc-preview-insight">${recommendationDetails(f,{showBadge:false})}<p class="qc-reason-hint">Click a tag to see the reasoning.</p></div>
@@ -180,5 +181,5 @@ export function createQuickMode({root,getFiles,getState,thumb,fileArt,hydrateArt
   if(dialog.open&&!files().some(f=>f.id===previewIds[previewIndex]))renderPreview();
   if(animate)sequence.start(all,{reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches});else setPhase('ready');
  }
- return {render,deactivate(){sequence.cancel();ringUI?.destroy();ringUI=null;setPhase('ready');},clearSelection(){selected.clear();if(dialog.open)dialog.close();updateSelection();},closePreview(){if(dialog.open)dialog.close();}};
+ return {render,refreshPreview(){if(dialog.open)renderPreview();},deactivate(){sequence.cancel();ringUI?.destroy();ringUI=null;setPhase('ready');},clearSelection(){selected.clear();if(dialog.open)dialog.close();updateSelection();},closePreview(){if(dialog.open)dialog.close();}};
 }

@@ -31,7 +31,7 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
 
   root.classList.add('explore-workspace');
   root.innerHTML=`<div class="explore-top"><button class="explore-back" type="button" aria-label="Back to Explore">${icon('prev')}Explore</button><form class="explore-search" role="search">${icon('search')}<input type="search" placeholder="Find a file…" aria-label="Search project files"><button type="submit" aria-label="Search project files">↗</button></form></div>
-    <div class="explore-heading"><div><h1></h1><span class="explore-count"></span><button class="explore-view-chip" type="button" hidden></button></div><button class="explore-next-type" type="button" hidden><span></span>${icon('next')}</button></div>
+    <div class="explore-heading"><div><h1></h1><span class="explore-count"></span><button class="explore-view-chip" type="button" hidden></button></div><nav class="explore-type-nav" aria-label="Browse file types" hidden><button class="explore-prev-type" type="button">${icon('prev')}<span></span></button><button class="explore-next-type" type="button"><span></span>${icon('next')}</button></nav></div>
     <div class="explore-filters" role="group" aria-label="Filter by AI suggestion"></div><div class="explore-grid"></div>
     <div class="explore-empty" hidden><span>⌕</span><p>No matching files</p><button class="secondary-button" type="button">Clear filters</button></div>
     <div class="explore-selection" hidden><div class="explore-selection-files"></div><span class="explore-selection-count"></span><button class="explore-clear" type="button">Clear</button><button class="explore-review-selection" type="button">Preview selection <span aria-hidden="true">↗</span></button><button class="explore-selection-archive explore-secondary" type="button">Archive</button><button class="explore-selection-trash explore-primary" type="button">Move to Trash</button></div>
@@ -57,7 +57,9 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
   q('.explore-review-selection').onclick=()=>{const files=queueFiles([...selected]);if(files.length)showDetail(files[0].id,files);};
   q('.explore-selection-archive').onclick=()=>takeAction([...selected],'archive');
   q('.explore-selection-trash').onclick=()=>takeAction([...selected],'trash');
-  q('.explore-next-type').onclick=()=>{const type=nextType();if(!type)return;clearSelection();filters={type:type.id,bucket:'',q:'',view:''};if(onTypeChange)onTypeChange(type.id);else render();};
+  const switchType=direction=>{const type=adjacentType(direction);if(!type)return;clearSelection();filters={type:type.id,bucket:'',q:'',view:''};if(onTypeChange)onTypeChange(type.id);else render();};
+  q('.explore-prev-type').onclick=()=>switchType(-1);
+  q('.explore-next-type').onclick=()=>switchType(1);
   q('[data-compare-close]').onclick=()=>compareDialog.close();
   q('[data-compare-prev]').onclick=()=>moveComparison(-1);
   q('[data-compare-next]').onclick=()=>moveComparison(1);
@@ -160,12 +162,14 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
     bindSelect(columns);renderCompareBatch();
     q('.explore-comparison-finding p').textContent=files.length?comparisonFinding(visible):'These files have been moved out of your workspace. You can restore them from History.';
   }
-  function nextType(){
+  function adjacentType(direction){
     if(!filters.type)return null;
     const present=new Set(currentFiles().map(f=>f.type)),known=TYPES.filter(t=>present.has(t.id));
     const unknown=[...present].filter(id=>!TYPES.some(t=>t.id===id)).sort().map(id=>({id,app:currentFiles().find(f=>f.type===id)?.app||'.'+id}));
     const available=[...known,...unknown],index=available.findIndex(t=>t.id===filters.type);
-    return available.length>1?available[(index+1)%available.length]:null;
+    if(available.length<2)return null;
+    if(index<0)return direction<0?available.at(-1):available[0];
+    return available[(index+direction+available.length)%available.length];
   }
   function render(options){
     const files=currentFiles(),nextScope=getState().session?.project||files[0]?.project||'';
@@ -175,7 +179,8 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
     const found=relevantFiles(),type=TYPES.find(t=>t.id===filters.type);
     q('.explore-heading h1').textContent=filters.type?(type?.app||'.'+filters.type)+' files':'Your project, up close';
     q('.explore-count').textContent=found.length+' '+(found.length===1?'file':'files');
-    const next=nextType();q('.explore-next-type').hidden=!next;
+    const previous=adjacentType(-1),next=adjacentType(1);q('.explore-type-nav').hidden=!next;
+    if(previous){q('.explore-prev-type span').textContent='Previous: '+previous.app;q('.explore-prev-type').setAttribute('aria-label','Previous file type: '+previous.app);}
     if(next){q('.explore-next-type span').textContent='Next: '+next.app;q('.explore-next-type').setAttribute('aria-label','Next file type: '+next.app);}
     q('.explore-view-chip').hidden=!filters.view;q('.explore-view-chip').textContent=(viewLabels[filters.view]||filters.view)+' ×';
     q('.explore-search input').value=filters.q;

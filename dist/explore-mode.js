@@ -179,7 +179,12 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
     const found=relevantFiles(),type=TYPES.find(t=>t.id===filters.type);
     q('.explore-heading h1').textContent=filters.type?(type?.app||'.'+filters.type)+' files':'Your project, up close';
     q('.explore-count').textContent=found.length+' '+(found.length===1?'file':'files');
-    q('.explore-type-nav').hidden=!adjacentType(1);
+    const previous=adjacentType(-1),next=adjacentType(1);q('.explore-type-nav').hidden=!next;
+    for(const [selector,target,direction] of [['.explore-prev-type',previous,'Previous'],['.explore-next-type',next,'Next']]){
+      const button=q(selector);
+      button.title=target?`${direction}: ${target.app}`:`${direction} file type`;
+      button.setAttribute('aria-label',target?`${direction} file type: ${target.app}`:`${direction} file type`);
+    }
     q('.explore-view-chip').hidden=!filters.view;q('.explore-view-chip').textContent=(viewLabels[filters.view]||filters.view)+' ×';
     q('.explore-search input').value=filters.q;
     q('.explore-filters').innerHTML='<span>AI suggestion</span>'+[{id:'',label:'All'},...BUCKETS].map(b=>`<button type="button" data-filter="${b.id}" aria-pressed="${filters.bucket===b.id}">${b.id?`<i data-bucket="${b.id}"></i>`:''}${esc(b.label)}</button>`).join('');

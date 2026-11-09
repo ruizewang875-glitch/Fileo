@@ -16,47 +16,50 @@ function body(start,end){
  return `${arc(R+W/2,start,end)} L${p(point(R-W/2,end))} ${arc(R-W/2,end,start,0).replace(/^M[^A]+/,'')} Z`;
 }
 
-// Keep the true data angles. Limit each head's forward overlap to its next
-// nonempty neighbor; otherwise a rounded cap can swallow a small category.
+// The ring is also a four-way selector. Give every nonempty category enough
+// visual arc for a circular head, its arrow and a readable name. Keep `share`
+// untouched: summaries and accessible labels always report the actual data.
+const TAIL_CLEARANCE=.20,HEAD_CLEARANCE=.12,MIN_FONT=20,MAX_FONT=25;
+function visualShares(list,shares){
+ const active=list.map((g,i)=>shares[i]>0||safe(g.count)>0?i:-1).filter(i=>i>=0),visual=shares.map(()=>0);
+ const floors=list.map(g=>Math.min((TAIL_CLEARANCE+HEAD_CLEARANCE+(String(g.label||g.id||'').length*.56*MIN_FONT+12)/(R-8))/TAU,.9/Math.max(1,active.length)));
+ let remaining=1,pending=[...active];
+ while(pending.length){
+  const sum=pending.reduce((n,i)=>n+shares[i],0);
+  const proposals=new Map(pending.map(i=>[i,remaining*(sum?shares[i]/sum:1/pending.length)]));
+  const constrained=pending.filter(i=>proposals.get(i)<floors[i]);
+  if(!constrained.length){for(const i of pending)visual[i]=proposals.get(i);break;}
+  for(const i of constrained){visual[i]=floors[i];remaining-=floors[i];}
+  pending=pending.filter(i=>!constrained.includes(i));
+ }
+ return visual;
+}
 export function buildRibbonLayout(groups=[]){
  const list=Array.isArray(groups)?groups:[],max=Math.max(0,...list.map(g=>safe(g.share)));
  const total=list.reduce((sum,g)=>sum+(max?safe(g.share)/max:0),0);
- const shares=list.map(g=>total?(safe(g.share)/max)/total:0);
+ const shares=list.map(g=>total?(safe(g.share)/max)/total:0),displayShares=visualShares(list,shares);
  let angle=-Math.PI/2;
- const layout=list.map((g,index)=>{
-  const share=shares[index],start=angle,end=start+share*TAU,span=end-start;angle=end;
-  const reverse=Math.sin(end)>0,head=point(R,end),outer=point(R+W/2,end),inner=point(R-W/2,end);
-  const hasCap=span>=.4&&span<TAU-.000001;
-  let nextShare=0;
-  for(let step=1;step<list.length;step++){const next=shares[(index+step)%list.length];if(next>0){nextShare=next;break;}}
-  const headDepth=hasCap?Math.min(W/2,nextShare*TAU*R*.35):0;
-  const capArc=`A${W/2} ${headDepth} ${end*180/Math.PI} 0 1 ${p(inner)}`;
+ return list.map((g,index)=>{
+  const share=shares[index],displayShare=displayShares[index],start=angle,end=start+displayShare*TAU,span=end-start;angle=end;
+  const labelUnits=Math.max(1,String(g.label||g.id||'').length*.56);
+  const available=Math.max(0,(span-TAIL_CLEARANCE-HEAD_CLEARANCE)*(R-8));
+  const fontSize=Math.min(MAX_FONT,available/labelUnits);
+  const labelCenter=end-HEAD_CLEARANCE-(labelUnits*fontSize)/(2*R);
+  const reverse=Math.sin(labelCenter)>0,head=point(R,end),outer=point(R+W/2,end),inner=point(R-W/2,end);
+  const hasCap=displayShare>0&&span<TAU-.000001;
+  const headDepth=hasCap?W/2:0;
+  const capArc=`A${W/2} ${W/2} 0 0 1 ${p(inner)}`;
   const headEdgePath=hasCap?`M${p(outer)} ${capArc}`:'';
-  // Overlap the body's exact circular edges by ~1.7 units. Two coincident,
-  // antialiased edges otherwise reveal a pale hairline through the join.
+  // The slight inward overlap removes antialiasing seams without changing the
+  // circular silhouette. A shared opaque gradient keeps head and body uniform.
   const joinStart=end-.008;
   const headPath=hasCap?`${arc(R+W/2,joinStart,end)} ${capArc} ${arc(R-W/2,end,joinStart,0).replace(/^M[^A]+/,'')} Z`:'';
-  const labelStart=start+.18,labelEnd=end-.10,available=Math.max(0,(labelEnd-labelStart)*R);
-  const fontSize=Math.min(25,available/Math.max(1,String(g.label||g.id||'').length*.56));
-  const labelFits=share>0&&fontSize>=16;
+  const labelStart=start+TAIL_CLEARANCE,labelEnd=end-HEAD_CLEARANCE;
+  const labelFits=displayShare>0&&fontSize>=MIN_FONT-.000001;
   const labelRadius=R+(reverse?8:-8);
   const labelPath=labelFits?arc(labelRadius,reverse?labelEnd:labelStart,reverse?labelStart:labelEnd,reverse?0:1):'';
-  return {...g,share,start,end,reverse,bodyPath:body(start,end),headPath,headEdgePath,headX:head[0],headY:head[1],headRadius:hasCap?W/2:0,headDepth,arrowRotation:end*180/Math.PI+90+(reverse?45:-45),labelPath,labelFits,fontSize,calloutPath:'',calloutX:0,calloutY:0,calloutAnchor:'start'};
+  return {...g,share,displayShare,displayExpanded:displayShare>share+1e-7,start,end,reverse,bodyPath:body(start,end),headPath,headEdgePath,headX:head[0],headY:head[1],headRadius:hasCap?W/2:0,headDepth,arrowRotation:end*180/Math.PI+90+(reverse?45:-45),labelPath,labelFits,fontSize};
  });
- // Short labels stay anchored to their own slice, outside the ring. Resolve
- // neighbors together so several tiny categories still have separate targets.
- const short=layout.filter(g=>(g.share>0||g.count>0)&&!g.labelFits);
- for(const side of [-1,1]){
-  const entries=short.filter(g=>Math.cos((g.start+g.end)/2)<0?side===-1:side===1).map(g=>({g,mid:(g.start+g.end)/2,y:point(270,(g.start+g.end)/2)[1]})).sort((a,b)=>a.y-b.y);
-  entries.forEach((entry,i)=>{entry.y=Math.max(24,Math.min(550,entry.y),i?entries[i-1].y+38:24);});
-  for(let i=entries.length-1;i>=0;i--)entries[i].y=Math.min(entries[i].y,i<entries.length-1?entries[i+1].y-38:550);
-  for(const {g,mid,y} of entries){
-   const edge=point(250,mid),elbow=point(268,mid),x=elbow[0]+side*48;
-   g.calloutX=x;g.calloutY=y;g.calloutAnchor=side<0?'end':'start';
-   g.calloutPath=`M${p(edge)} L${p(elbow)} L${p([x-side*12,y])}`;
-  }
- }
- return layout;
 }
 
 let serial=0;
@@ -64,7 +67,7 @@ export function createRibbonRing({root,onSelect=()=>{}}){
  const uid='fileo-ribbon-'+(++serial);
  let state={groups:[],selected:'',metric:'space',phase:'ready',totalCount:0,totalSize:0},destroyed=false;
  const nodes=new Map();root.classList.add('br-root');
- root.innerHTML=`<div class="br-stage"><svg class="br-svg" viewBox="0 0 1000 580" role="group" aria-label="Filter files by AI suggestion"><defs><radialGradient id="${uid}-center"><stop stop-color="#faf8fc"/><stop offset="1" stop-color="#eae3f1" stop-opacity=".25"/></radialGradient><filter id="${uid}-shadow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3"/></filter></defs><circle cx="500" cy="288" r="178" fill="url(#${uid}-center)"/><circle class="br-track" cx="500" cy="288" r="214" fill="none" stroke="#eae5ed" stroke-width="72"/><g class="br-art"><g class="br-bodies"></g><g class="br-heads" aria-hidden="true"></g><g class="br-labels" aria-hidden="true"></g><g class="br-callouts"></g></g><circle class="br-scanner" cx="500" cy="288" r="214" fill="none" stroke="#b5a2c5" stroke-width="72" stroke-linecap="round" stroke-dasharray="180 1165" aria-hidden="true"/></svg><div class="br-center"><span class="br-center-label"></span><strong class="br-center-value"></strong><span class="br-center-detail"></span></div></div>`;
+ root.innerHTML=`<div class="br-stage"><svg class="br-svg" viewBox="0 0 1000 580" role="group" aria-label="Filter files by AI suggestion"><defs><radialGradient id="${uid}-center"><stop stop-color="#faf8fc"/><stop offset="1" stop-color="#eae3f1" stop-opacity=".25"/></radialGradient><filter id="${uid}-shadow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3"/></filter></defs><circle cx="500" cy="288" r="178" fill="url(#${uid}-center)"/><circle class="br-track" cx="500" cy="288" r="214" fill="none" stroke="#eae5ed" stroke-width="72"/><g class="br-art"><g class="br-bodies"></g><g class="br-heads" aria-hidden="true"></g><g class="br-labels" aria-hidden="true"></g></g><circle class="br-scanner" cx="500" cy="288" r="214" fill="none" stroke="#b5a2c5" stroke-width="72" stroke-linecap="round" stroke-dasharray="180 1165" aria-hidden="true"/></svg><div class="br-center"><span class="br-center-label"></span><strong class="br-center-value"></strong><span class="br-center-detail"></span></div></div>`;
  const $=s=>root.querySelector(s),defs=$('defs');
  const add=(tag,attrs,parent)=>{const n=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);parent.append(n);return n;};
  function activate(id){if(['resolved','ready'].includes(state.phase)&&nodes.get(id)?.group.count)onSelect(id);}
@@ -82,22 +85,17 @@ export function createRibbonRing({root,onSelect=()=>{}}){
   const path=add('path',{'class':'br-segment','data-bucket':g.id,fill:`url(#${uid}-${g.id})`,role:'button',tabindex:0},$('.br-bodies'));
   const title=add('title',{},path);
   const head=add('g',{'class':'br-head','data-bucket':g.id},$('.br-heads'));
+  const headTitle=add('title',{},head);
   const shadow=add('path',{'class':'br-head-shadow',fill:'none',stroke:'#85758c','stroke-width':4,opacity:.11,filter:`url(#${uid}-shadow)`},head);
   const cap=add('path',{fill:`url(#${uid}-${g.id})`},head);
   const label=add('g',{'class':'br-label','data-bucket':g.id},$('.br-labels'));
   const arrow=add('path',{'class':'br-arrow',d:'M-10 0 H9 M1 -8 L9 0 L1 8',fill:'none','stroke-linecap':'round','stroke-linejoin':'round','stroke-width':2.7},label);
   const text=add('text',{'class':'br-arc-text'},label),textPath=add('textPath',{href:`#${uid}-${g.id}-label`},text);
-  const callout=add('g',{'class':'br-callout','data-bucket':g.id,role:'button',tabindex:-1},$('.br-callouts'));
-  callout.style.setProperty('--category-color',palette[0]);
-  const leader=add('path',{'class':'br-callout-line',fill:'none','stroke-width':1.6,'stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'},callout);
-  const hit=add('rect',{'class':'br-callout-hit',fill:'transparent',rx:8,'aria-hidden':'true'},callout);
-  const calloutText=add('text',{'class':'br-callout-text','dominant-baseline':'middle','aria-hidden':'true'},callout);
-
-  path.addEventListener('click',()=>activate(g.id));head.addEventListener('click',()=>activate(g.id));callout.addEventListener('click',()=>activate(g.id));
-  [path,callout].forEach(el=>el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate(g.id);}}));
-  [path,head,callout].forEach(n=>{n.addEventListener('pointerenter',()=>hover(g.id));n.addEventListener('pointerleave',unhover);});
-  [path,callout].forEach(el=>{el.addEventListener('focus',()=>hover(g.id));el.addEventListener('blur',unhover);});
-  const n={group:g,path,title,head,shadow,cap,label,arrow,text,textPath,labelPath,gradient,mutedGradient,callout,leader,hit,calloutText};nodes.set(g.id,n);return n;
+  path.addEventListener('click',()=>activate(g.id));head.addEventListener('click',()=>activate(g.id));
+  path.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate(g.id);}});
+  [path,head].forEach(n=>{n.addEventListener('pointerenter',()=>hover(g.id));n.addEventListener('pointerleave',unhover);});
+  path.addEventListener('focus',()=>hover(g.id));path.addEventListener('blur',unhover);
+  const n={group:g,path,title,head,headTitle,shadow,cap,label,arrow,text,textPath,labelPath,gradient,mutedGradient};nodes.set(g.id,n);return n;
  }
  function fitLabels(){
   if(destroyed)return;
@@ -110,22 +108,19 @@ export function createRibbonRing({root,onSelect=()=>{}}){
  document.fonts?.ready.then(fitLabels);
  function update(next){
   state={...state,...next};const layout=buildRibbonLayout(state.groups),present=new Set(layout.map(g=>g.id));
-  for(const[id,n]of nodes)if(!present.has(id)){[n.path,n.head,n.label,n.callout,n.labelPath,n.gradient,n.mutedGradient].forEach(el=>el.remove());nodes.delete(id);}
+  for(const[id,n]of nodes)if(!present.has(id)){[n.path,n.head,n.label,n.labelPath,n.gradient,n.mutedGradient].forEach(el=>el.remove());nodes.delete(id);}
   layout.forEach(g=>{
    const n=nodes.get(g.id)||create(g);n.group=g;const selected=state.selected===g.id;
    n.path.setAttribute('d',g.bodyPath);n.shadow.setAttribute('d',g.headEdgePath);n.cap.setAttribute('d',g.headPath);
    const fill=`url(#${uid}-${g.id}${state.selected&&!selected?'-muted':''})`;n.path.setAttribute('fill',fill);n.cap.setAttribute('fill',fill);
    n.labelPath.setAttribute('d',g.labelPath);n.textPath.textContent=g.label;n.textPath.setAttribute('startOffset',g.reverse?'0%':'100%');n.text.setAttribute('text-anchor',g.reverse?'start':'end');n.text.setAttribute('font-size',g.fontSize);n.label.style.display=g.labelFits?'':'none';
    n.arrow.setAttribute('transform',`translate(${g.headX} ${g.headY}) rotate(${g.arrowRotation})`);
-   n.path.setAttribute('aria-label',`${g.label}, ${g.count} files. ${selected?'Selected. Scroll to view files.':'Click to view files.'}`);n.path.setAttribute('aria-pressed',String(selected));
-   n.title.textContent=`${g.label} · ${selected?'Selected · Scroll to view files':'Click to view files'}`;
-   [n.path,n.head,n.label,n.callout].forEach(el=>{el.classList.toggle('is-muted',!!state.selected&&!selected);el.classList.toggle('is-selected',selected);});
-   const showCallout=!!g.calloutPath&&!!g.count;
-   n.callout.style.display=showCallout?'':'none';n.callout.setAttribute('aria-hidden',String(!showCallout));n.callout.setAttribute('aria-label',n.path.getAttribute('aria-label'));n.callout.setAttribute('aria-pressed',String(selected));
-   n.leader.setAttribute('d',g.calloutPath);
-   n.calloutText.textContent=g.label+' ↗';n.calloutText.setAttribute('x',g.calloutX);n.calloutText.setAttribute('y',g.calloutY);n.calloutText.setAttribute('text-anchor',g.calloutAnchor);
-   const labelWidth=String(g.label).length*12+25;
-   n.hit.setAttribute('x',g.calloutAnchor==='end'?g.calloutX-labelWidth-8:g.calloutX-8);n.hit.setAttribute('y',g.calloutY-20);n.hit.setAttribute('width',labelWidth+16);n.hit.setAttribute('height',40);
+   const expansion=g.displayExpanded?' Small segment expanded for easier selection.':'';
+   n.path.setAttribute('aria-label',`${g.label}, ${(g.share*100).toFixed(1)}%, ${g.count} files. ${selected?'Selected. Scroll to view files.':'Click to view files.'}${expansion}`);n.path.dataset.expanded=String(g.displayExpanded);n.path.setAttribute('aria-pressed',String(selected));
+   n.title.textContent=`${g.label} · ${(g.share*100).toFixed(1)}% · ${selected?'Selected · Scroll to view files':'Click to view files'}${expansion}`;
+   n.headTitle.textContent=n.title.textContent;
+   [n.path,n.head,n.label].forEach(el=>{el.classList.toggle('is-muted',!!state.selected&&!selected);el.classList.toggle('is-selected',selected);});
+
   });
   $('.br-center-label').textContent=state.metric==='files'?'Project files':'Project storage';
   $('.br-center-value').textContent=state.metric==='files'?String(state.totalCount):formatStorage(state.totalSize);
@@ -135,7 +130,7 @@ export function createRibbonRing({root,onSelect=()=>{}}){
  function setPhase(phase){
   state.phase=phase;root.dataset.phase=phase;const enabled=['resolved','ready'].includes(phase);
   for(const n of nodes.values()){
-   n.path.setAttribute('tabindex',enabled&&n.group.share&&n.group.count?'0':'-1');n.path.setAttribute('aria-disabled',String(!enabled||!n.group.count));n.callout.setAttribute('tabindex',enabled&&n.group.calloutPath&&n.group.count?'0':'-1');n.callout.setAttribute('aria-disabled',String(!enabled||!n.group.count));
+   n.path.setAttribute('tabindex',enabled&&n.group.displayShare&&n.group.count?'0':'-1');n.path.setAttribute('aria-disabled',String(!enabled||!n.group.count));
   }
   if(!enabled)unhover();
  }

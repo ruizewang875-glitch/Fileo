@@ -15,14 +15,6 @@
 .br-center{position:absolute;left:50%;top:49.655%;transform:translate(-50%,-50%);width:30%;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;pointer-events:none}
 .br-center-label,.br-center-detail{font-size:clamp(11px,1.2vw,14px);color:#9a87a3}
 .br-center-value{font-family:"FILEO Grotesk",sans-serif;font-size:clamp(29px,4.6vw,48px);font-weight:400;line-height:1.1;letter-spacing:-2px;color:#52405e;white-space:nowrap;font-variant-numeric:tabular-nums}
-/* Compact, slice-anchored labels remain available when the arc is too short. */
-.br-callout{cursor:pointer;outline:none;transition:opacity .25s}
-.br-callout-line{stroke:var(--category-color);pointer-events:none}
-.br-callout-text{fill:#665174;font-family:"FILEO Grotesk",sans-serif;font-size:20px;font-weight:400;pointer-events:none}
-.br-callout.is-muted{opacity:.3}
-.br-callout:focus-visible .br-callout-hit{stroke:#9873aa;stroke-width:2}
-.br-callout:hover .br-callout-text{fill:#4f355e}
-html[data-theme=dark] .br-callout-text{fill:#d5c6df}
 .br-root[data-hover=keep] :is(.br-segment,.br-head)[data-bucket=keep],.br-root[data-hover=archive] :is(.br-segment,.br-head)[data-bucket=archive],.br-root[data-hover=trash] :is(.br-segment,.br-head)[data-bucket=trash],.br-root[data-hover=undecided] :is(.br-segment,.br-head)[data-bucket=undecided]{filter:brightness(1.055)}
 .br-scanner{opacity:0;transform-origin:500px 288px;pointer-events:none}
 .br-root:is([data-phase=overview],[data-phase=scanning]) .br-art{opacity:0;transform:scale(.85) rotate(-26deg);pointer-events:none}

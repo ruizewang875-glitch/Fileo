@@ -15,6 +15,12 @@
 .qc-summary-values{display:flex;align-items:baseline;justify-content:center;gap:12px;white-space:nowrap}
 .qc-summary-copy strong{font-family:"FILEO Grotesk",sans-serif;font-size:28px;font-weight:500;letter-spacing:-1px;color:#77516f}
 .qc-summary-values > * + *:before{content:"·";padding-right:12px;color:#b3a1bc;font-size:16px;font-weight:400;letter-spacing:0}
+.qc-project-total{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px 12px;max-width:100%;padding:9px 14px;border-radius:10px;background:transparent;color:#88738f;font-size:14px;cursor:pointer;transition:background .18s,color .18s}
+.qc-summary-copy .qc-project-total strong{font-size:24px;letter-spacing:-.7px}
+.qc-project-total .qc-total-count{border-left:1px solid #d8cede;padding-left:12px;font-variant-numeric:tabular-nums}
+.qc-project-total svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.qc-project-total:hover{background:#eee6f16b;color:#63456e}
+.qc-project-total:focus-visible{outline:2px solid #ad90ba;outline-offset:3px}
 .qc-scroll-cue{display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:5px 10px;border-radius:8px;background:transparent;color:#94819e;font-size:13px;min-height:34px}
 .qc-scroll-cue svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
 .qc-scroll-cue:hover{color:#63456e;background:#eee6f155}

@@ -124,9 +124,12 @@ export function createRibbonRing({root,onSelect=()=>{}}){
    [n.path,n.head,n.label].forEach(el=>{el.classList.toggle('is-muted',!!state.selected&&!selected);el.classList.toggle('is-selected',selected);});
 
   });
-  $('.br-center-label').textContent=state.metric==='files'?'Project files':'Project storage';
-  $('.br-center-value').textContent=state.metric==='files'?String(state.totalCount):formatStorage(state.totalSize);
-  $('.br-center-detail').textContent=state.metric==='files'?formatStorage(state.totalSize):`${state.totalCount} files`;
+  const active=state.groups.find(g=>g.id===state.selected);
+  const count=active?active.count:state.totalCount,size=active?active.size:state.totalSize;
+  $('.br-center-label').textContent=active?`${active.label} · ${(active.share*100).toFixed(1)}%`:state.metric==='files'?'Project files':'Project storage';
+  $('.br-center-value').textContent=state.metric==='files'?String(count):formatStorage(size);
+  $('.br-center-detail').textContent=state.metric==='files'?formatStorage(size):`${count} ${count===1?'file':'files'}`;
+  $('.br-center').setAttribute('role','status');$('.br-center').setAttribute('aria-live','polite');$('.br-center').setAttribute('aria-atomic','true');
   root.dataset.selection=state.selected||'';fitLabels();setPhase(state.phase);
  }
  function setPhase(phase){

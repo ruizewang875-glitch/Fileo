@@ -5,6 +5,8 @@ import {fileCover} from './document-previews.js';
 import {installSuggestionPopovers,recommendationDetails,suggestionBadge} from './recommendation-ui.js';
 import {installSuggestionFeedback} from './suggestion-feedback.js';
 import {createProjectPreferencesUI} from './project-preferences-ui.js';
+import {createAccountSettings} from './account-settings.js';
+import {createGeneralSettings} from './general-settings.js';
 import {createPrivacyUI} from './privacy-ui.js';
 import {PRIVACY_VERSION, PRIVACY_TYPES, isReadingAllowed} from './privacy.js';
 import {createCarousel} from './carousel.js';
@@ -31,16 +33,17 @@ const currentFiles=()=>projectCatalog().filter(isActiveFile);
 const modeHome=()=>({page:state().session.mode==='explore'?'explore':'quick'});
 const pending=()=>currentFiles().filter(f=>f.decision==='pending');
 const previewUrls=new Map();
-const prefUI=createProjectPreferencesUI({getTags:p=>ws.getProjectPreferences(p),setTags:(p,tags)=>ws.setProjectPreferences(p,tags),onSaved:()=>refreshCurrent()});
+const prefUI=createProjectPreferencesUI({getTags:p=>ws.getProjectPreferences(p),setTags:(p,tags)=>ws.setProjectPreferences(p,tags),onSaved:()=>{refreshCurrent();settingsFeedback('Preferences updated','Your choices now guide AI suggestions for this project.');}});
 const suggestionPopovers=installSuggestionPopovers({getFile:id=>currentFiles().find(f=>f.id===id)});
 const privacyUI=createPrivacyUI({
  getPrivacy:()=>ws.getPrivacy(),
  setPrivacy:types=>ws.setPrivacy(types),
- onSaved:()=>{
+ onSaved:({mode}={})=>{
   suggestionPopovers.close();
   quickUI.clearSelection();exploreUI.clearSelection();
   refreshCurrent();syncPrivacyEntry();
   if($('#preview-dialog').open)updatePreview();
+  if(mode==='settings')settingsFeedback('Privacy choices saved','AI suggestions now follow your file-type permissions.');
  }
 });
 function syncPrivacyEntry(){
@@ -63,7 +66,9 @@ function navigate(params={},options={}){
  else{if((location.hash||'#')!==next)history.pushState(null,'',next);renderRoute();}
 }
 function closeDialogs(){for(const d of $$('dialog[open]'))d.close();confirmFn=null;clarifyId=null;clarifyChoice=null;}
-const carousel=createCarousel({getFiles:()=>state().session.signedIn?currentFiles():FILES,onSelect:type=>{if(guard({page:'browse',type}))navigate({page:'browse',type});},isEnabled:()=>!$('#home-view').hidden&&!$('dialog[open]'),autoplay:state().session.autoplay});
+const carousel=createCarousel({getFiles:()=>state().session.signedIn?currentFiles():FILES,onSelect:type=>{if(guard({page:'browse',type}))navigate({page:'browse',type});},isEnabled:()=>!$('#home-view').hidden&&!$('dialog[open]'),autoplay:true});
+const generalUI=createGeneralSettings({onChange:p=>carousel.setAutoplay(!p.reducedMotion&&!p.compatibility)});
+carousel.setAutoplay(!generalUI.effective().reducedMotion&&!generalUI.effective().compatibility);
 
 function notify(message,event=null){clearTimeout(toastTimer);$('#toast-message').textContent=message;toastEvent=event?.id||null;$('#toast-undo').hidden=!event||!ws.canUndo(event.id);$('#toast').hidden=false;toastTimer=setTimeout(()=>$('#toast').hidden=true,7000);}
 function syncHeader(){const s=state(),initials=s.session.name.trim().split(/\s+/).map(v=>Array.from(v)[0]||'').slice(0,2).join('').toUpperCase();$('#header-avatar').textContent=s.session.signedIn?initials:'↗';$('#account-button').setAttribute('aria-label',s.session.signedIn?`${s.session.name} — account settings`:'Log in');$('#account-button').dataset.signedIn=String(s.session.signedIn);$('#storage-alert').hidden=!s.storageError;}
@@ -85,7 +90,7 @@ async function completeLogin(identity){
   if(!consent||!$('#login-dialog').open)return;
  }
  if(!ws.login(identity)){showAuthStep('auth-options');$('#auth-error').textContent='Enter a valid email address.';$('#auth-error').hidden=false;$('#login-email').focus();return;}
- $('#login-dialog').close();sort=state().session.sort;carousel.setAutoplay(state().session.autoplay);
+ $('#login-dialog').close();sort=state().session.sort;carousel.setAutoplay(!generalUI.effective().reducedMotion&&!generalUI.effective().compatibility);
  const intent=authIntent;
  if(intent.page==='demo'){loadDemo();return;}
  if(!records().length){navigate({page:'import'},{replace:route.page==='home'});return;}
@@ -348,7 +353,12 @@ const feedbackUI=installSuggestionFeedback({
  onApplied:()=>{suggestionPopovers.close();refreshCurrent();quickUI.refreshPreview();if($('#preview-dialog').open)updatePreview();}
 });
 $('#toast-undo').onclick=()=>undo(toastEvent);$('#toast-close').onclick=()=>$('#toast').hidden=true;
-$('#account-button').onclick=()=>{if(!state().session.signedIn)return openLogin({page:'home'});const p=state().session;$('#account-name').textContent=p.name;$('#account-email').textContent=p.email||'Prototype workspace';$('#account-avatar').textContent=$('#header-avatar').textContent;$('#display-name').value=p.name;$('#account-sort').value=p.sort;$('#account-autoplay').checked=p.autoplay;$('#account-save-status').textContent='';prefUI.syncAccount(p.project);syncPrivacyEntry();$('#account-panel').showModal();};$('#account-close').onclick=()=>$('#account-panel').close();$('#account-form').onsubmit=e=>{e.preventDefault();const name=$('#display-name').value.trim();if(!name)return;ws.updateProfile({name,sort:$('#account-sort').value,autoplay:$('#account-autoplay').checked});sort=state().session.sort;carousel.setAutoplay(state().session.autoplay);$('#account-name').textContent=name;$('#account-save-status').textContent='Saved';refreshCurrent();};$('#logout-button').onclick=()=>{closeDialogs();ws.logout();navigate({page:'home'});$('#toast').hidden=true;};
+function settingsFeedback(title,description){accountUI.show(state().storageError?'Applied for this visit':title,state().storageError?'Browser storage is unavailable. Your choices may not remain after you close this page.':description);}
+const accountUI=createAccountSettings({getSession:()=>state().session,saveName:name=>{ws.updateProfile({name});return !state().storageError;},onNameSaved:refreshCurrent});
+$('#account-button').onclick=()=>{if(!state().session.signedIn)return openLogin({page:'home'});accountUI.sync();prefUI.syncAccount(state().session.project);syncPrivacyEntry();$('#account-panel').showModal();};
+$('#account-close').onclick=()=>$('#account-panel').close();
+$('#account-general-open').onclick=()=>generalUI.open();
+$('#logout-button').onclick=()=>{closeDialogs();ws.logout();navigate({page:'home'});$('#toast').hidden=true;};
 $('#assistant-button').onclick=()=>{if(!guard(modeHome()))return;$('#assistant-panel').showModal();};$('#assistant-close').onclick=()=>$('#assistant-panel').close();$('#assistant-form').onsubmit=e=>{e.preventDefault();navigate({page:'browse',q:$('#assistant-query').value.trim()});};$$('[data-assistant-query]').forEach(b=>b.onclick=()=>navigate({page:'browse',q:b.dataset.assistantQuery}));$$('[data-assistant-view]').forEach(b=>b.onclick=()=>navigate({page:'browse',view:b.dataset.assistantView}));
 $$('[data-close]').forEach(b=>b.onclick=()=>$('#'+b.dataset.close).close());for(const d of $$('dialog'))d.addEventListener('click',e=>{if(e.target!==d||d.classList.contains('qc-preview-dialog'))return;const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();});document.addEventListener('keydown',e=>{if(!['import','analysis','review'].includes(route.page)&&(e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'&&state().session.signedIn&&records().length){e.preventDefault();closeDialogs();navigate({});setTimeout(()=>$('#browse-view input[type=search]')?.focus(),0);}});
 document.addEventListener('keydown',e=>{if(route.page!=='review'||$('dialog[open]')||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;if(e.key==='ArrowLeft'&&!$('#review-prev').disabled){e.preventDefault();nextReview(-1);}if(e.key==='ArrowRight'&&!$('#review-next').disabled){e.preventDefault();nextReview(1);}});

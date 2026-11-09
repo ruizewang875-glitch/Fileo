@@ -15,8 +15,8 @@
 .prefs-presets,.prefs-custom-list{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .prefs-preset,.prefs-custom-tag{position:relative;display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:7px 12px;border:1px solid #ddd3e1;border-radius:8px;background:#ffffffb8;color:#67576f;text-align:left;font-weight:450;font-size:13px;line-height:1.35;overflow-wrap:anywhere;transition:background .15s,border-color .15s}
 .prefs-preset:before{content:"+";font:400 16px/1 Arial,sans-serif;display:inline-grid;place-content:center;width:13px;color:#9e87a7}
-.prefs-preset[aria-pressed=true]{border-color:#b997bf;background:#eee2f1;color:#633b71}
-.prefs-preset[aria-pressed=true]:before{content:"";width:9px;height:5px;margin:0 2px;border-left:1.7px solid #84558f;border-bottom:1.7px solid #84558f;transform:translateY(-1px) rotate(-45deg)}
+.prefs-preset[aria-pressed=true]{border-color:#9c75ab;background:linear-gradient(115deg,#ebd5e6,#e2d7f0);color:#4e305e;font-weight:600;box-shadow:0 2px 7px #9f7bb91f}
+.prefs-preset[aria-pressed=true]:before{content:"";width:9px;height:5px;margin:0 2px;border-left:2px solid #694477;border-bottom:2px solid #694477;transform:translateY(-1px) rotate(-45deg)}
 .prefs-preset:hover,.prefs-custom-tag:hover{border-color:#b794c2}
 .prefs-custom-label{display:block;margin:22px 0 7px;color:#514457;font-weight:500;font-size:14px}
 .prefs-custom-entry{gap:4px;padding:3px 4px 3px 11px;border:1px solid #dcd3e0;border-radius:9px;background:#fff}
@@ -26,7 +26,7 @@
 .prefs-custom-entry button{display:grid;place-items:center;flex:none;width:33px;height:33px;border-radius:6px;background:#ece1ef;color:#754784}
 .prefs-custom-entry button:disabled{color:#ab9eb1;background:#f5f1f5;cursor:default}
 .prefs-custom-list{margin-top:9px;gap:6px}
-.prefs-custom-tag{max-width:100%;min-height:31px;padding:5px 9px;background:#f1e8f2;border-color:#e7d9e9;color:#735780}
+.prefs-custom-tag{max-width:100%;min-height:34px;padding:6px 10px;background:linear-gradient(115deg,#ebd5e6,#e2d7f0);border-color:#9c75ab;color:#4e305e;font-weight:600;box-shadow:0 2px 7px #9f7bb91f}
 .prefs-custom-tag:after{content:"×";font-size:15px;line-height:1;color:#94769c}
 .prefs-feedback{margin:8px 0 0;font-size:13px;color:#8c3d63}
 .prefs-actions{margin-top:26px;padding-top:17px;border-top:1px solid #e7dfe9}
@@ -48,10 +48,11 @@
 .prefs-account-edit:focus-visible{outline:2px solid #75558b;outline-offset:3px}
 @media(prefers-reduced-motion:reduce){.prefs-account-edit{transition:none}}
 @media(forced-colors:active){.prefs-account-edit{border-color:ButtonText}}
-.prefs-account-copy{display:grid;min-width:0;gap:4px}
-.prefs-account-copy>*{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.prefs-account-copy strong{font-weight:500;font-size:14px;color:#52405e}
-.prefs-account-copy>span{font-size:12px;color:#796b82}
+.prefs-account-copy{display:grid;min-width:0;gap:10px}
+.prefs-account-copy strong{font-weight:450;font-size:12px;line-height:1.35;color:#83728e;overflow-wrap:anywhere}
+.prefs-account-copy>.prefs-account-tags{display:flex;flex-wrap:wrap;gap:7px;min-width:0;color:#5e3c6b;font-size:15px;line-height:1.35;font-weight:550}
+.prefs-account-tag{display:inline-flex;align-items:center;max-width:100%;padding:7px 10px;border:1px solid #c9adcf;border-radius:8px;background:linear-gradient(115deg,#f1dfec,#e9e0f4);color:#5b3869;font-size:15px;line-height:1.35;font-weight:550;overflow-wrap:anywhere;box-shadow:0 2px 6px #a384b315}
+.prefs-account-tags[data-empty=true]{padding:2px 0 4px}
 .prefs-account-edit>svg{flex:none}
 @media(max-width:600px){.welcome-intro{max-width:39ch;margin-bottom:15px;padding:0 8px}.prefs-dialog{padding:22px}.prefs-dialog h2{margin-top:20px}.prefs-actions{margin-top:20px}.prefs-preset{padding:7px 9px}.prefs-presets{gap:7px}}
 

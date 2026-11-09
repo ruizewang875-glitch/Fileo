@@ -1,0 +1,28 @@
+#account-panel{width:min(430px,calc(100% - 40px));padding:28px;scrollbar-width:thin}
+#account-panel .panel-heading h2{font-size:21px}
+.account-name-field{margin-bottom:26px}
+.account-name-entry{position:relative;display:block}
+.account-name-entry input{padding-right:54px;min-height:49px!important;font-size:14px!important}
+.account-name-save{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:32px;height:32px;border:0;border-radius:9px;color:white;background:linear-gradient(135deg,#b07dac,#725084);box-shadow:0 2px 7px #82548b25;display:grid;place-items:center;cursor:pointer}
+.account-name-save svg{width:18px;height:18px}
+.account-name-save:disabled{opacity:.35;cursor:default}
+.account-name-save:focus-visible{outline:2px solid #9e79ba;outline-offset:3px}
+.account-general-section{padding:20px 0 0;border-top:1px solid var(--line,#e6dee9)}
+.account-general-entry{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px 0;text-align:left;border:0;background:none;color:var(--ink,#45384e);cursor:pointer}
+.account-general-entry>span{display:grid;gap:5px;min-width:0}
+.account-general-entry strong{font-size:15px;font-weight:500}
+.account-general-entry small{font-size:12px;color:var(--muted,#897492);line-height:1.5}
+.account-general-entry:hover{color:#865791}
+#account-panel .account-note{margin:24px 0 12px;font-size:11px;max-width:none}
+#account-panel .logout-button{margin-top:8px}
+.account-feedback{width:min(430px,calc(100% - 32px));padding:34px;border:1px solid #e0d0e9;border-radius:22px;background:#fcf9ff;color:#49364f;box-shadow:0 24px 85px #39284330;text-align:center}
+.account-feedback::backdrop{background:#30253833;backdrop-filter:blur(4px)}
+.account-feedback-mark{display:grid;place-items:center;width:52px;height:52px;margin:0 auto 20px;border-radius:50%;color:#75528a;background:linear-gradient(140deg,#f5dfef,#e7ddf8);box-shadow:0 0 24px #d9b8e236}
+.account-feedback-mark svg{width:27px;height:27px}
+.account-feedback h2{font:500 24px/1.2 'FILEO Grotesk',sans-serif;letter-spacing:-.6px;margin:0 0 12px}
+.account-feedback p{font-size:15px;line-height:1.65;color:#817089;margin:0;overflow-wrap:anywhere}
+.account-feedback-actions{display:flex;gap:10px;justify-content:center;margin-top:26px}
+.account-feedback-actions button{min-height:44px;padding:10px 22px;border-radius:11px;border:1px solid #ded0e6;background:transparent;color:inherit;font-size:14px;cursor:pointer}
+#account-feedback-confirm{background:#49364f;border-color:#49364f;color:#fff;min-width:130px}
+.account-feedback-actions button:focus-visible{outline:2px solid #aa85bd;outline-offset:3px}
+@media(max-width:480px){#account-panel{padding:24px;width:calc(100% - 28px)}.account-feedback{padding:28px}}

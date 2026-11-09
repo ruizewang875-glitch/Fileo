@@ -66,9 +66,20 @@ export function createProjectPreferencesUI({getTags,setTags,onSaved=()=>{}}) {
     accountProject=String(project||'').trim();
     byId('account-project-preferences').hidden=!accountProject;
     if(!accountProject)return;
-    const list=getTags(accountProject)||[],rest=list.length-2;
+    const list=getTags(accountProject)||[];
     byId('prefs-account-project').textContent=accountProject;
-    byId('prefs-account-summary').textContent=list.length?list.slice(0,2).join(' · ')+(rest>0?` · +${rest}`:''):'Add preferences';
+    const summary=byId('prefs-account-summary');
+    summary.className='prefs-account-tags';
+    summary.replaceChildren();
+    summary.dataset.empty=String(!list.length);
+    if(list.length){
+      for(const tag of list){
+        const chip=document.createElement('span');
+        chip.className='prefs-account-tag';
+        chip.textContent=tag;
+        summary.append(chip);
+      }
+    }else summary.textContent='Choose your priorities';
     accountEdit.setAttribute('aria-label',`Edit project preferences for ${accountProject}`);
   }
   function finish(outcome) {

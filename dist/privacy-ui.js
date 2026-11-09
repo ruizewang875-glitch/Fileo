@@ -64,8 +64,8 @@ export function createPrivacyUI({getPrivacy,setPrivacy,onSaved=()=>{}}){
   $('#privacy-save-error').hidden=true;
   try{
    if(setPrivacy({...types})===false)throw new Error('save failed');
-   syncAccount();finish(true);
-   try{onSaved();}catch(error){console.error('FILEO privacy refresh failed',error);}
+   const mode=active.mode;syncAccount();finish(true);
+   try{onSaved({mode});}catch(error){console.error('FILEO privacy refresh failed',error);}
   }catch{
    $('#privacy-save-error').textContent='Your choices could not be saved. Please try again.';
    $('#privacy-save-error').hidden=false;

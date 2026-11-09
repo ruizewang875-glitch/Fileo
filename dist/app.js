@@ -108,7 +108,7 @@ $('#google-demo-account').onclick=()=>completeLogin({name:'Demo Designer',email:
 $('#email-back').onclick=$('#google-back').onclick=()=>showAuthStep('auth-options');
 function renderHome(){
  const s=state(),files=currentFiles(),has=s.session.signedIn&&projectCatalog().length;
- $('#welcome-intro').hidden=s.session.signedIn;$('#home-dock').hidden=!has;$('#welcome-actions').hidden=!!has;$('#resume-card').hidden=!has;$('#home-view').classList.toggle('has-workspace',!!has);$('#home-workspace-actions').hidden=!has;
+ $('#welcome-intro').hidden=s.session.signedIn;$('#home-dock').hidden=!has;$('#welcome-actions').hidden=!!has;$('#resume-card').hidden=!has||route.page==='explore';$('#home-view').classList.toggle('has-workspace',!!has);$('#home-workspace-actions').hidden=!has||route.page==='explore';
  $('#welcome-primary').innerHTML=s.session.signedIn?'Choose files <span>↗</span>':'Log in & add files <span>↗</span>';$('#welcome-secondary').textContent=s.session.signedIn?'Read a local folder →':'Explore a demo →';
  carousel.refresh?.();if(!has)return;
  const left=pending().length,done=files.length-left,pct=files.length?Math.round(done/files.length*100):0;

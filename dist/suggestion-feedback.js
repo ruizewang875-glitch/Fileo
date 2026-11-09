@@ -19,7 +19,7 @@ export function feedbackControl(file){
 export function installSuggestionFeedback({getFile,onRate,onCorrect,onApplied,notify}={}){
  let anchor=null,menu=null,observer=null,frame=0,clarify=null,clarifyAnchor=null,clarifyId=null,choice=null,busy=false,operation=0,notice=null,noticeTimer=0;
  const activeFile=id=>{const file=getFile?.(id);return file&&!['archive','trash'].includes(file.decision)?file:null;};
- function visibleControl(id){return [...document.querySelectorAll('button[data-feedback-file]')].find(button=>button.dataset.feedbackFile===id&&button.getClientRects().length&&!button.closest('[hidden],[inert]'));}
+ function visibleControl(id){return [...document.querySelectorAll('button[data-feedback-file]')].reverse().find(button=>button.dataset.feedbackFile===id&&button.getClientRects().length&&!button.closest('[hidden],[inert]'));}
  function restoreFocus(id,original){const target=original?.isConnected&&original.getClientRects().length?original:visibleControl(id);target?.focus({preventScroll:true});}
  function syncControls(file){
   if(!file)return;

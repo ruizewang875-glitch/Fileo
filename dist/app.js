@@ -10,7 +10,7 @@ import {createGeneralSettings} from './general-settings.js';
 import {createPrivacyUI} from './privacy-ui.js';
 import {PRIVACY_VERSION, PRIVACY_TYPES, isReadingAllowed} from './privacy.js';
 import {createCarousel} from './carousel.js';
-import {createQuickMode} from './quick-mode.js?v=30';
+import {createQuickMode} from './quick-mode.js?v=31';
 import {createExploreMode} from './explore-mode.js';
 import {projectFiles} from './mode-model.js';
 import {isActiveFile} from './file-lifecycle.js';
@@ -33,7 +33,22 @@ const currentFiles=()=>projectCatalog().filter(isActiveFile);
 const modeHome=()=>({page:state().session.mode==='explore'?'explore':'quick'});
 const pending=()=>currentFiles().filter(f=>f.decision==='pending');
 const previewUrls=new Map();
-const prefUI=createProjectPreferencesUI({getTags:p=>ws.getProjectPreferences(p),setTags:(p,tags)=>ws.setProjectPreferences(p,tags),onSaved:()=>{refreshCurrent();settingsFeedback('Preferences updated','Your choices now guide AI suggestions for this project.');}});
+let preferenceChanges=0;
+const prefUI=createProjectPreferencesUI({
+ getTags:p=>ws.getProjectPreferences(p),
+ setTags:(project,tags)=>{
+  const before=new Map(records().filter(f=>f.project===project&&isActiveFile(f)).map(f=>[f.id,f.bucket]));
+  const saved=ws.setProjectPreferences(project,tags);
+  preferenceChanges=records().filter(f=>before.has(f.id)&&before.get(f.id)!==f.bucket).length;
+  return saved;
+ },
+ onSaved:()=>{
+  refreshCurrent();
+  settingsFeedback('Preferences updated',preferenceChanges
+   ?`${preferenceChanges} ${preferenceChanges===1?'file suggestion has':'file suggestions have'} changed. Your overview and file list are up to date.`
+   :'Your current categories already match these preferences. AI reasoning has been refreshed.');
+ }
+});
 const suggestionPopovers=installSuggestionPopovers({getFile:id=>currentFiles().find(f=>f.id===id)});
 const privacyUI=createPrivacyUI({
  getPrivacy:()=>ws.getPrivacy(),

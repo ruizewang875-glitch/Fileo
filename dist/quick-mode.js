@@ -3,7 +3,7 @@ import {feedbackControl} from './suggestion-feedback.js';
 import {BUCKETS, formatStorage, searchFiles} from './data.js';
 import {rankFiles} from './mode-model.js';
 import {isActiveFile} from './file-lifecycle.js';
-import {createRibbonRing} from './bubble-ring.js?v=30';
+import {createRibbonRing} from './bubble-ring.js?v=31';
 import {createOverviewSequence} from './quick-loading.js';
 import {createPreviewQueue,previewTrashTargets,previewAfterTrash} from './quick-preview-model.js';
 

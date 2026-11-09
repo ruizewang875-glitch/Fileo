@@ -23,14 +23,16 @@ const TAIL_CLEARANCE=.20,HEAD_CLEARANCE=.12,MIN_FONT=20,MAX_FONT=25;
 function visualShares(list,shares){
  const active=list.map((g,i)=>shares[i]>0||safe(g.count)>0?i:-1).filter(i=>i>=0),visual=shares.map(()=>0);
  const floors=list.map(g=>Math.min((TAIL_CLEARANCE+HEAD_CLEARANCE+(String(g.label||g.id||'').length*.56*MIN_FONT+12)/(R-8))/TAU,.9/Math.max(1,active.length)));
- let remaining=1,pending=[...active];
- while(pending.length){
-  const sum=pending.reduce((n,i)=>n+shares[i],0);
-  const proposals=new Map(pending.map(i=>[i,remaining*(sum?shares[i]/sum:1/pending.length)]));
-  const constrained=pending.filter(i=>proposals.get(i)<floors[i]);
-  if(!constrained.length){for(const i of pending)visual[i]=proposals.get(i);break;}
-  for(const i of constrained){visual[i]=floors[i];remaining-=floors[i];}
-  pending=pending.filter(i=>!constrained.includes(i));
+ if(active.length===1){visual[active[0]]=1;return visual;}
+ // Reserve only the space needed for the heads/labels, then distribute ALL
+ // remaining space from the current data. A hard floor hid changes whenever
+ // two small categories traded files while the larger categories stayed equal.
+ const reserved=active.reduce((sum,i)=>sum+floors[i],0),remaining=1-reserved;
+ const totalShare=active.reduce((sum,i)=>sum+shares[i],0);
+ const totalCount=active.reduce((sum,i)=>sum+safe(list[i].count),0);
+ for(const i of active){
+  const weight=totalShare?shares[i]/totalShare:totalCount?safe(list[i].count)/totalCount:1/active.length;
+  visual[i]=floors[i]+remaining*weight;
  }
  return visual;
 }
@@ -115,7 +117,7 @@ export function createRibbonRing({root,onSelect=()=>{}}){
    const fill=`url(#${uid}-${g.id}${state.selected&&!selected?'-muted':''})`;n.path.setAttribute('fill',fill);n.cap.setAttribute('fill',fill);
    n.labelPath.setAttribute('d',g.labelPath);n.textPath.textContent=g.label;n.textPath.setAttribute('startOffset',g.reverse?'0%':'100%');n.text.setAttribute('text-anchor',g.reverse?'start':'end');n.text.setAttribute('font-size',g.fontSize);n.label.style.display=g.labelFits?'':'none';
    n.arrow.setAttribute('transform',`translate(${g.headX} ${g.headY}) rotate(${g.arrowRotation})`);
-   const expansion=g.displayExpanded?' Small segment expanded for easier selection.':'';
+   const expansion=Math.abs(g.displayShare-g.share)>1e-7?' Arc spacing reserves room for labels; percentage reflects actual data.':'';
    n.path.setAttribute('aria-label',`${g.label}, ${(g.share*100).toFixed(1)}%, ${g.count} files. ${selected?'Selected. Scroll to view files.':'Click to view files.'}${expansion}`);n.path.dataset.expanded=String(g.displayExpanded);n.path.setAttribute('aria-pressed',String(selected));
    n.title.textContent=`${g.label} · ${(g.share*100).toFixed(1)}% · ${selected?'Selected · Scroll to view files':'Click to view files'}${expansion}`;
    n.headTitle.textContent=n.title.textContent;

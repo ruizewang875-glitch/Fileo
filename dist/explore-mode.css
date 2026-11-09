@@ -37,9 +37,9 @@
 :is(.explore-file-card,.explore-category)[data-bucket=archive]{--explore-rgb:158,128,186;--explore-category:#9674ac}
 :is(.explore-file-card,.explore-category)[data-bucket=trash]{--explore-rgb:193,125,157;--explore-category:#b65e89}
 .explore-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:40px 26px}
-.explore-file-card{display:flex;flex-direction:column;min-width:0;position:relative;border:1px solid rgba(var(--explore-rgb),.58);border-radius:17px;background:#ffffff6b;overflow:visible;box-shadow:0 5px 24px -13px rgba(var(--explore-rgb),.34);transition:box-shadow .22s,border-color .22s,transform .22s}
-.explore-file-card:hover{border-color:rgba(var(--explore-rgb),.88);box-shadow:0 13px 34px -14px rgba(var(--explore-rgb),.34);transform:translateY(-3px)}
-.explore-file-card.is-selected{border-color:var(--explore-category);box-shadow:0 0 0 2px rgba(var(--explore-rgb),.18),0 9px 28px -15px rgba(var(--explore-rgb),.45)}
+.explore-file-card{display:flex;flex-direction:column;min-width:0;position:relative;border:1px solid rgba(var(--explore-rgb),.82);border-radius:17px;background:#ffffff6b;overflow:visible;box-shadow:0 0 0 .35px rgba(var(--explore-rgb),.18),0 0 16px -3px rgba(var(--explore-rgb),.18),0 7px 24px -12px rgba(var(--explore-rgb),.36);transition:box-shadow .22s,border-color .22s,transform .22s}
+.explore-file-card:hover{border-color:rgba(var(--explore-rgb),.98);box-shadow:0 0 0 .35px rgba(var(--explore-rgb),.24),0 0 20px -3px rgba(var(--explore-rgb),.24),0 13px 34px -14px rgba(var(--explore-rgb),.4);transform:translateY(-3px)}
+.explore-file-card.is-selected{border-color:var(--explore-category);box-shadow:0 0 0 2px rgba(var(--explore-rgb),.28),0 0 20px -3px rgba(var(--explore-rgb),.22),0 9px 28px -13px rgba(var(--explore-rgb),.45)}
 .explore-card-image{position:relative;height:auto;aspect-ratio:4/3;background:var(--file-mat,#f0edf1);border-radius:16px 16px 0 0;overflow:hidden}
 .explore-open-detail{display:block;width:100%;height:100%;padding:0;background:none;overflow:hidden;position:relative}
 .explore-art{display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;isolation:isolate}

@@ -19,6 +19,25 @@ test('sample import is resumable, deterministic and idempotent',()=>{
  assert.deepEqual(ws.loadDemo(),{added:0,skipped:FILES.length,ids:[]});assert.equal(ws.getState().files.length,FILES.length);
  assert.deepEqual(new Set(ws.getState().files.map(f=>f.bucket)),new Set(['keep','archive','trash','undecided']));
 });
+test('choosing existing demo files replays a resumable scan without resetting user choices',()=>{
+ const storage=memory(),ws=make(storage);ws.login('Alex');ws.updateProfile({mode:'explore'});
+ ws.loadDemo();ws.finishAnalysis();ws.setProjectPreferences('Studio semester',['Keep working versions']);
+ ws.decide('file-1','archive');ws.decide('file-2','trash');
+ ws.setSuggestionFeedback('file-5',{rating:'bad',correctedBucket:'keep'});
+ ws.importFiles([input('personal.txt')],{project:'Personal'});ws.finishAnalysis();
+ ws.setPrivacy({...allTypePermissions(false),psd:true});
+ const before=ws.getState(),result=ws.loadDemo({reanalyze:true}),after=ws.getState();
+ assert.equal(result.added,0);assert.equal(after.files.length,before.files.length);
+ assert.deepEqual(after.files,before.files);assert.deepEqual(after.history,before.history);
+ assert.deepEqual(after.projectPreferences,before.projectPreferences);assert.deepEqual(after.privacy,before.privacy);
+ assert.equal(after.session.project,'Studio semester');assert.equal(after.session.mode,'explore');
+ assert.equal(after.analysis.status,'pending');assert.equal(after.analysis.step,0);
+ assert.deepEqual(new Set(after.analysis.ids),new Set(after.files.filter(f=>f.source==='demo'&&!['archive','trash'].includes(f.decision)).map(f=>f.id)));
+ ws.setAnalysisStep(2);
+ const resumed=createWorkspace({storage,now:()=>NOW});assert.deepEqual(resumed.getState().analysis,ws.getState().analysis);
+ resumed.finishAnalysis();assert.equal(resumed.getState().analysis.status,'done');assert.equal(resumed.getState().session.mode,'explore');
+ assert.deepEqual(resumed.getState().review.ids,[]);
+});
 test('metadata import handles native files without unrelated sample images',()=>{
  const ws=make();const result=ws.importFiles([input('chair.3dm',{relativePath:'Furniture/chair.3dm'}),input('sketch.psd'),input('notes.txt',{lastModified:0}),input('shot.png',{type:'image/png',previewData:'data:image/png;base64,YWJj'})]);
  assert.equal(result.added,4);const [native,psd,notes,image]=ws.getState().files;

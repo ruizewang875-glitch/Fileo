@@ -177,7 +177,7 @@ function renderRoute(){
  if(['explore','browse'].includes(route.page))ws.updateProfile({mode:'explore'});
  if((location.hash||'#')!==hash(route))history.replaceState(null,'',hash(route));
  const focused=['import','analysis','review'].includes(route.page);document.body.dataset.focus=String(focused);document.body.dataset.page=route.page;
- $('#flow-exit').hidden=!focused;$('#flow-stepper').hidden=!focused;$$('[data-step]').forEach(el=>el.setAttribute('aria-current',el.dataset.step===route.page?'step':'false'));
+ $('#flow-exit').hidden=!focused;
  for(const id of ['home','quick','browse','import','analysis','review'])$('#'+id+'-view').hidden=id==='home'?!['home','explore'].includes(route.page):id!==route.page;
  if(route.page!=='quick')quickUI.deactivate();
  if(['home','explore'].includes(route.page))renderHome();if(route.page==='quick')quickUI.render({enter:lastPage!=='quick'});if(route.page==='browse')exploreUI.render(route);
@@ -258,13 +258,13 @@ async function loadDemo(){
   if(outcome==='back'){if(route.page==='home')renderHome();return;}
  }
  if(!state().session.signedIn)return;
- const result=ws.loadDemo();if(result.added)navigate({page:'analysis'});else navigate(modeHome());
+ ws.loadDemo({reanalyze:true});navigate({page:'analysis'});
 }
 $('#import-demo').onclick=loadDemo;
 function startAnalysis(){
  const s=state(),generation=routeGeneration;if(s.analysis.status!=='pending')return;
  const allowed=s.files.some(f=>s.analysis.ids.includes(f.id)&&isReadingAllowed(f,s.privacy));
- const names=allowed?['Checking permitted files','Finding signals','Preparing suggestions']:['Listing files','Preparing your workspace','Ready for your review'];
+ const names=allowed?['Checking permitted files','Finding signals','Preparing suggestions']:['Listing files','Preparing your workspace','Opening your workspace'];
  $('#analysis-title').textContent=allowed?'Preparing suggestions':'Preparing files';
  $('#analysis-view .local-note').textContent=allowed?'AI suggestions use only file types you allowed.':'AI reading is off. Your files are available for manual review.';
  $('#analysis-count').textContent=`${s.analysis.ids.length} ${s.analysis.ids.length===1?'file':'files'}`;

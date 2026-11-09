@@ -34,7 +34,7 @@ export function createCarousel({onSelect,isEnabled=()=>true,autoplay=true,getFil
   if(card.dataset.file===String(i))return;
   card.dataset.file=i;card.dataset.type=entry.type;card.setAttribute('aria-label',`Browse ${file.app} files, ${file.ext}`);
   const preview=typeof file.previewData==='string'&&/^(data:image\/(?:png|jpe?g|webp|gif|avif|bmp);base64,|blob:)/i.test(file.previewData)?file.previewData:'';
-  const cover=entry.demo&&document.body.dataset.page==='explore'?typeCarouselCover(file):null;card.style.setProperty('--cover-focus',cover?.focus||'50% 50%');
+  const cover=entry.demo?typeCarouselCover(file):null;card.style.setProperty('--cover-focus',cover?.focus||'50% 50%');
   const artwork=preview?`<img src="${escape(preview)}" alt="Preview of ${escape(file.file)}" draggable="false">`:cover?`<img src="${escape(cover.src)}" alt="${escape(cover.alt)}" draggable="false">`:entry.demo?art(file):nativeTile(file);
   const kind=iconKinds.has(file.kind)?file.kind:'generic';
   const badge=kind==='indesign'?'Id':(assetIcons.has(kind)?`<img src="assets/${kind}.svg" alt="${escape(markNames[kind]||file.app)}" draggable="false">`:'<svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="#eee4f3" stroke-width="1.5" aria-hidden="true"><path d="M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6 M9 16h6"/></svg>');

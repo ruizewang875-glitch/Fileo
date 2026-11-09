@@ -301,14 +301,18 @@ export function createWorkspace(options={}) {
    if(!project||!state.files.some(f=>f.project===project))return false;
    state.session.project=project;persist();return true;
   },
-  loadDemo(){
+  loadDemo({reanalyze=false}={}){
    purgeExpiredTrash();
    const existing=new Set(state.files.filter(f=>f.source==='demo').map(f=>f.id));
    for(const file of state.files.filter(f=>f.source==='demo')){file.collection=file.collection||file.project;file.project=DEMO_PROJECT;}
    state.session.project=DEMO_PROJECT;
    const records=FILES.filter(f=>!existing.has(f.id)&&!state.purgedDemoIds.includes(f.id)).map(f=>makeDemoRecord(f,timestamp()));
    const result=addRecords(records,FILES.length-records.length);
-   if(!records.length){refreshRecommendations(state,timestamp(),new Set([DEMO_PROJECT]));persist();}
+   if(!records.length)refreshRecommendations(state,timestamp(),new Set([DEMO_PROJECT]));
+   // Choosing the demo explicitly starts its preparation view again without
+   // restoring archived/deleted files or resetting any user choices.
+   if(reanalyze)state.analysis={status:'pending',step:0,ids:state.files.filter(f=>f.source==='demo'&&f.project===DEMO_PROJECT&&isActiveFile(f)).map(f=>f.id)};
+   if(!records.length||reanalyze)persist();
    return result;
   },
   importFiles(descriptors,{project:requestedProject}={}){

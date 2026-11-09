@@ -63,11 +63,11 @@
 .activity-event-thumbnail:has(>.activity-file-count){grid-template-rows:minmax(0,1fr) auto}
 .activity-event-thumbnail>.activity-file-count{position:static;place-self:end center;padding:1px 3px;min-width:0;box-shadow:none}
 
-/* Only the Explore type carousel has editorial full-bleed art. File grids,
-   opened files and comparisons always use their original complete previews. */
-body[data-page="explore"] .file-card .card-surface,body[data-page="explore"] .file-card .card-art{background:#302838}
-body[data-page="explore"] .file-card .card-art{inset:0;display:block;padding:0}
-body[data-page="explore"] .file-card .card-art>img{display:block;width:100%;height:100%;max-width:none;max-height:none;object-fit:cover;object-position:var(--cover-focus,50% 50%)}
-body[data-page="explore"] .file-card .card-art::after{content:"";position:absolute;inset:52% 0 0;pointer-events:none;background:linear-gradient(to bottom,transparent 0%,#19131e13 26%,#19131e94 70%,#19131eda 100%)}
-body[data-page="explore"] .file-card .card-caption{z-index:2;background:transparent;backdrop-filter:none;border:0;color:#fff;text-shadow:0 1px 3px #161018a6}
-body[data-page="explore"] .file-card .file-ext{color:#fff;background:#201923ae;border-color:#ffffff56}
+/* Welcome and Explore share the same editorial full-bleed type carousel.
+   File grids, opened files and comparisons retain complete source previews. */
+body:is([data-page="home"],[data-page="explore"]) .file-card .card-surface,body:is([data-page="home"],[data-page="explore"]) .file-card .card-art{background:#302838}
+body:is([data-page="home"],[data-page="explore"]) .file-card .card-art{inset:0;display:block;padding:0}
+body:is([data-page="home"],[data-page="explore"]) .file-card .card-art>img{display:block;width:100%;height:100%;max-width:none;max-height:none;object-fit:cover;object-position:var(--cover-focus,50% 50%)}
+body:is([data-page="home"],[data-page="explore"]) .file-card .card-art::after{content:"";position:absolute;inset:52% 0 0;pointer-events:none;background:linear-gradient(to bottom,transparent 0%,#19131e13 26%,#19131e94 70%,#19131eda 100%)}
+body:is([data-page="home"],[data-page="explore"]) .file-card .card-caption{z-index:2;background:transparent;backdrop-filter:none;border:0;color:#fff;text-shadow:0 1px 3px #161018a6}
+body:is([data-page="home"],[data-page="explore"]) .file-card .file-ext{color:#fff;background:#201923ae;border-color:#ffffff56}

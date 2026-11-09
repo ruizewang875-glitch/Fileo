@@ -1,12 +1,12 @@
 import {readDocumentPreview} from './document-previews.js';
 // Local raster previews: a small catalog thumbnail plus a larger IndexedDB image.
-// Original files are neither uploaded nor retained. Source files above 100 MiB or
+// This module retains only rendered previews. Source files above 100 MiB or
 // decoded images above 60 MP receive an explicit fallback instead of exhausting memory.
 export const PREVIEW_LIMITS=Object.freeze({sourceBytes:100*1024*1024,pixels:60000000,thumbnailEdge:360,previewEdge:1600,thumbnailChars:150000});
 const MIME_BY_EXT={jpg:'image/jpeg',jpeg:'image/jpeg',jpe:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif',avif:'image/avif',bmp:'image/bmp',svg:'image/svg+xml',tif:'image/tiff',tiff:'image/tiff',heic:'image/heic',heif:'image/heif'};
 const RASTER_MIMES=new Set(['image/jpeg','image/png','image/webp','image/gif','image/avif','image/bmp','image/x-ms-bmp']);
 const SUPPORTED_MIMES=new Set([...RASTER_MIMES,'image/svg+xml']);
-const memory=new Map(),urls=new Map(),pendingReads=new Map();
+const memory=new Map(),urls=new Map(),pendingReads=new Map(),deletedKeys=new Set(),deletedIds=new Set();
 let dbPromise=null;
 
 export function imageKind(file={}){
@@ -46,7 +46,7 @@ function openDB(){
  return dbPromise;
 }
 async function saveBlob(key,blob){
- memory.set(key,blob);
+ deletedKeys.delete(key);memory.set(key,blob);
  const db=await openDB();if(!db)return false;
  return new Promise(resolve=>{
   let settled=false;const finish=value=>{if(settled)return;settled=true;clearTimeout(timer);resolve(value);};
@@ -55,12 +55,13 @@ async function saveBlob(key,blob){
  });
 }
 async function readBlob(key){
+ if(deletedKeys.has(key))return null;
  if(memory.has(key))return memory.get(key);
- const db=await openDB();if(!db)return null;
+ const db=await openDB();if(!db||deletedKeys.has(key))return null;
  return new Promise(resolve=>{
   let settled=false;const finish=value=>{if(settled)return;settled=true;clearTimeout(timer);resolve(value);};
   const timer=setTimeout(()=>finish(null),2500);
-  try{const request=db.transaction('previews','readonly').objectStore('previews').get(key);request.onsuccess=()=>{const blob=request.result;if(blob instanceof Blob&&/^image\/(webp|jpeg|png)$/.test(blob.type)){memory.set(key,blob);finish(blob);}else finish(null);};request.onerror=()=>finish(null);}catch{finish(null);}
+  try{const request=db.transaction('previews','readonly').objectStore('previews').get(key);request.onsuccess=()=>{const blob=request.result;if(deletedKeys.has(key)){finish(null);return;}if(blob instanceof Blob&&/^image\/(webp|jpeg|png)$/.test(blob.type)){memory.set(key,blob);finish(blob);}else finish(null);};request.onerror=()=>finish(null);}catch{finish(null);}
  });
 }
 async function bitmap(file){
@@ -132,14 +133,32 @@ export async function preparePreview(file){
  finally{decoded?.dispose();if(canvas)canvas.width=canvas.height=1;}
 }
 export async function getPreviewUrl(record={}){
- const key=record.previewKey;if(!key)return record.previewData||null;
+ if(deletedIds.has(record.id))return null;
+ const key=record.previewKey;if(deletedKeys.has(key))return null;if(!key)return record.previewData||null;
  if(urls.has(key))return urls.get(key);
  if(!pendingReads.has(key))pendingReads.set(key,(async()=>{
   const blob=await readBlob(key);
-  if(!blob||typeof URL.createObjectURL!=='function')return null;
+  if(!blob||deletedKeys.has(key)||typeof URL.createObjectURL!=='function')return null;
   const value=URL.createObjectURL(blob);urls.set(key,value);return value;
  })().finally(()=>pendingReads.delete(key)));
- return await pendingReads.get(key)||record.previewData||null;
+ const value=await pendingReads.get(key);return deletedIds.has(record.id)||deletedKeys.has(key)?null:value||record.previewData||null;
+}
+// Preview keys can be shared by multiple catalog records. Preserve keys still
+// referenced by the remaining workspace while invalidating the expired IDs.
+export async function deleteStoredPreviews(records=[],{retainKeys=[]}={}){
+ const entries=Array.isArray(records)?records:[],retained=new Set(retainKeys);
+ const keys=[...new Set(entries.map(file=>file?.previewKey).filter(key=>typeof key==='string'&&key.length>0&&key.length<=500&&!retained.has(key)))];
+ for(const file of entries)if(typeof file?.id==='string')deletedIds.add(file.id);
+ for(const key of keys){deletedKeys.add(key);memory.delete(key);pendingReads.delete(key);const url=urls.get(key);if(url)URL.revokeObjectURL(url);urls.delete(key);}
+ if(!keys.length)return {ok:true,deleted:0,failedKeys:[]};
+ const db=await openDB();
+ if(!db){if(globalThis.indexedDB)dbPromise=null;return {ok:!globalThis.indexedDB,deleted:keys.length,failedKeys:globalThis.indexedDB?keys:[]};}
+ const ok=await new Promise(resolve=>{
+  let finished=false,tx;const done=value=>{if(finished)return;finished=true;clearTimeout(timer);resolve(value);};
+  const timer=setTimeout(()=>{try{tx?.abort();}catch{}done(false);},3000);
+  try{tx=db.transaction('previews','readwrite');const store=tx.objectStore('previews');for(const key of keys)store.delete(key);tx.oncomplete=()=>done(true);tx.onerror=tx.onabort=()=>done(false);}catch{done(false);}
+ });
+ return {ok,deleted:keys.length,failedKeys:ok?[]:keys};
 }
 export function revokePreviewUrls(){for(const value of urls.values())URL.revokeObjectURL(value);urls.clear();}
 if(typeof globalThis.addEventListener==='function')globalThis.addEventListener('pagehide',revokePreviewUrls);

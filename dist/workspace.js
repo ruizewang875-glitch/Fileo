@@ -1,6 +1,7 @@
 import {FILES, typeForExtension} from './data.js';
 import {assessRecommendation, PREFERENCE_PRESETS} from './recommendation.js';
 import {PRIVACY_VERSION,freshPrivacy,normalizePrivacy,isReadingAllowed} from './privacy.js';
+import {isActiveFile,isExpiredTrash} from './file-lifecycle.js';
 
 // The prototype stores a catalog, never modifies source files on disk.
 const KEY = 'fileo-workspace-v2';
@@ -32,8 +33,14 @@ export function normalizePreferenceTags(values) {
 const validEmail = value => typeof value === 'string' && value.trim().length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) ? value.trim().toLowerCase() : '';
 const returnRoute = value => typeof value === 'string' && value.length <= 2048 && /^#(?:files|projects|dashboard|activity|quick|explore|browse)?(?:\?[^<>]*)?$/.test(value) ? value : '#files';
 const freshReview = () => ({ids:[],cursor:0,returnTo:'#files',deferred:[]});
-const fresh = () => ({version:2, session:{signedIn:false,name:'Designer',email:'',provider:'demo',authMode:'prototype',sort:'modified',autoplay:true,mode:'quick',project:''},privacy:freshPrivacy(),projectPreferences:Object.create(null),files:[],history:[],analysis:{status:'idle',step:0,ids:[]},review:freshReview(),resumeId:null,saved:[],recent:[],storageError:false});
-const snapshot = file => ({id:file.id,decision:file.decision,clarification:clone(file.clarification),revision:file.revision});
+const fresh = () => ({version:2, session:{signedIn:false,name:'Designer',email:'',provider:'demo',authMode:'prototype',sort:'modified',autoplay:true,mode:'quick',project:''},privacy:freshPrivacy(),projectPreferences:Object.create(null),files:[],history:[],purgedDemoIds:[],pendingPurgedFiles:[],analysis:{status:'idle',step:0,ids:[]},review:freshReview(),resumeId:null,saved:[],recent:[],storageError:false});
+const snapshot = file => ({id:file.id,decision:file.decision,clarification:clone(file.clarification),revision:file.revision,archivedAt:file.archivedAt??null,trashedAt:file.trashedAt??null});
+const validActionTime = value => Number.isFinite(value)&&value>=0;
+function applyLifecycle(file,decision,clock,previous=null){
+ delete file.archivedAt;delete file.trashedAt;
+ if(decision==='archive')file.archivedAt=validActionTime(previous?.archivedAt)?previous.archivedAt:clock;
+ if(decision==='trash')file.trashedAt=validActionTime(previous?.trashedAt)?previous.trashedAt:clock;
+}
 const sameResult = (a,b) => !!a&&!!b&&a.decision===b.decision&&JSON.stringify(a.clarification??null)===JSON.stringify(b.clarification??null);
 const sampleReasons = {
  keep:'Active project work. Keep it within reach.',
@@ -87,6 +94,9 @@ function restoreState(raw,clock) {
  const state=fresh();
  if (!raw || raw.version!==2 || !Array.isArray(raw.files)) return state;
  state.privacy=normalizePrivacy(raw.privacy);
+ state.purgedDemoIds=Array.isArray(raw.purgedDemoIds)?[...new Set(raw.purgedDemoIds.filter(id=>DEMO_FILES.has(id)))]:[];
+ const purgedDemoIds=new Set(state.purgedDemoIds);
+ state.pendingPurgedFiles=Array.isArray(raw.pendingPurgedFiles)?[...new Map(raw.pendingPurgedFiles.filter(file=>file&&typeof file.id==='string').map(file=>[file.id,{id:file.id,...(cleanText(file.previewKey,500)?{previewKey:cleanText(file.previewKey,500)}:{})}])).values()]:[];
  const session=raw.session||{};
  state.session={signedIn:session.signedIn===true,name:cleanText(session.name,40)||'Designer',email:validEmail(session.email),provider:PROVIDERS.has(session.provider)?session.provider:'demo',authMode:'prototype',sort:SORTS.has(session.sort)?session.sort:'modified',autoplay:session.autoplay!==false,mode:MODES.has(session.mode)?session.mode:'quick',project:cleanText(session.project,300)};
  if(raw.projectPreferences&&typeof raw.projectPreferences==='object'&&!Array.isArray(raw.projectPreferences)){
@@ -97,7 +107,7 @@ function restoreState(raw,clock) {
  }
  const seen=new Set(),upgradedCodeIds=new Set();
  for (const f of raw.files) {
-  if (!f || typeof f.id!=='string' || seen.has(f.id) || typeof f.file!=='string' || !BUCKETS.has(f.bucket) || !Number.isFinite(f.size) || f.size<0) continue;
+  if (!f || typeof f.id!=='string' || purgedDemoIds.has(f.id) || seen.has(f.id) || typeof f.file!=='string' || !BUCKETS.has(f.bucket) || !Number.isFinite(f.size) || f.size<0) continue;
   const record={...f,project:cleanText(f.project,300)||'Imported files',decision:DECISIONS.has(f.decision)?f.decision:'pending',clarification:safeClarification(f.clarification),revision:Number.isSafeInteger(f.revision)&&f.revision>=0?f.revision:0,source:f.source==='demo'?'demo':'local'};
   if(record.source==='local'){
    delete record.image;
@@ -139,13 +149,36 @@ function restoreState(raw,clock) {
    const stored=Array.isArray(event.after)?event.after.find(a=>a?.id===id&&DECISIONS.has(a.decision)):null;
    const revision=event.afterRevision[id],file=state.files.find(f=>f.id===id);
    const recovered=stored||state.history.flatMap(e=>e.before).find(b=>b.id===id&&b.revision===revision)||(file?.revision===revision?file:null);
-   return recovered?{id,decision:recovered.decision,clarification:safeClarification(recovered.clarification),revision:recovered.revision}:null;
+   return recovered?{id,decision:recovered.decision,clarification:safeClarification(recovered.clarification),revision:recovered.revision,...(Object.hasOwn(recovered,'archivedAt')?{archivedAt:recovered.archivedAt}:{}),...(Object.hasOwn(recovered,'trashedAt')?{trashedAt:recovered.trashedAt}:{})}:null;
   }).filter(Boolean);
+ }
+ // Keep a stable retention clock across reloads, including pre-retention workspaces.
+ const recordedTime=(id,decision,before=Infinity)=>{
+  const event=state.history.find(event=>validActionTime(event.at)&&event.at<=clock&&event.at<=before&&event.after?.some(item=>item.id===id&&item.decision===decision));
+  if(!event)return undefined;
+  const entry=event.after.find(item=>item.id===id),stored=entry[decision==='trash'?'trashedAt':'archivedAt'];
+  return validActionTime(stored)&&stored<=clock?stored:event.at;
+ };
+ for(const event of state.history){
+  for(const entry of event.before){
+   if(entry.decision==='archive'&&!validActionTime(entry.archivedAt))entry.archivedAt=recordedTime(entry.id,'archive',event.at)??clock;
+   if(entry.decision==='trash'&&!validActionTime(entry.trashedAt))entry.trashedAt=recordedTime(entry.id,'trash',event.at)??clock;
+  }
+  for(const entry of event.after){
+   if(entry.decision==='archive'&&!validActionTime(entry.archivedAt))entry.archivedAt=validActionTime(event.at)?event.at:clock;
+   if(entry.decision==='trash'&&!validActionTime(entry.trashedAt))entry.trashedAt=validActionTime(event.at)?event.at:clock;
+  }
+ }
+ for(const file of state.files){
+  const field=file.decision==='archive'?'archivedAt':file.decision==='trash'?'trashedAt':null;
+  const existing=field&&validActionTime(file[field])?Math.min(file[field],clock):null;
+  const recovered=field?(recordedTime(file.id,file.decision)??(validActionTime(file.updatedAt)?Math.min(file.updatedAt,clock):clock)):clock;
+  applyLifecycle(file,file.decision,existing??recovered);
  }
  // Extend only a previously loaded sample project. Do not attach samples to personal imports,
  // reset a paused scan, or add new files to an existing review queue.
  if(state.files.some(f=>f.source==='demo'&&f.project===DEMO_PROJECT&&DEMO_FILES.has(f.id))){
-  for(const file of FILES){if(!seen.has(file.id))state.files.push(makeDemoRecord(file,clock));}
+  for(const file of FILES){if(!seen.has(file.id)&&!purgedDemoIds.has(file.id))state.files.push(makeDemoRecord(file,clock));}
  }
  refreshRecommendations(state,clock);
  return state;
@@ -166,7 +199,8 @@ export function createWorkspace(options={}) {
  let state=fresh(),serial=0;
  const listeners=new Set();
  const timestamp=()=>{const n=Number(now());return Number.isFinite(n)?n:Date.now();};
- try {const raw=storage?.getItem(KEY);if(raw)state=restoreState(JSON.parse(raw),timestamp());} catch {state.storageError=true;}
+ let restoredRaw=null;
+ try {const raw=storage?.getItem(KEY);if(raw){restoredRaw=JSON.parse(raw);state=restoreState(restoredRaw,timestamp());}} catch {state.storageError=true;}
  const uid=prefix=>`${prefix}-${timestamp().toString(36)}-${globalThis.crypto?.randomUUID?.()||(++serial).toString(36)+'-'+Math.random().toString(36).slice(2,9)}`;
  const getState=()=>clone(state);
  const emit=()=>{for(const fn of listeners){try{fn(getState());}catch(error){console.error('FILEO workspace listener failed',error);}}};
@@ -190,14 +224,37 @@ export function createWorkspace(options={}) {
   const event=state.history.find(e=>e.id===eventId);
   return !!event&&event.action!=='restore'&&!event.undone&&event.fileIds.length>0&&event.fileIds.every(id=>{
    const file=state.files.find(f=>f.id===id),after=event.after?.find(a=>a.id===id);
-   return file&&latestActiveEvent(id)?.id===event.id&&file.revision===event.afterRevision[id]&&sameResult(file,after)&&event.before.some(b=>b.id===id);
+   return file&&!isExpiredTrash(file,timestamp())&&!isExpiredTrash(event.before.find(b=>b.id===id),timestamp())&&latestActiveEvent(id)?.id===event.id&&file.revision===event.afterRevision[id]&&sameResult(file,after)&&event.before.some(b=>b.id===id);
   });
+ }
+ function purgeExpiredTrash(){
+  const clock=timestamp(),expired=state.files.filter(file=>isExpiredTrash(file,clock));
+  if(!expired.length)return [];
+  const ids=new Set(expired.map(file=>file.id)),projects=new Set(expired.map(file=>file.project));
+  state.pendingPurgedFiles=[...new Map([...state.pendingPurgedFiles,...expired.map(file=>({id:file.id,...(file.previewKey?{previewKey:file.previewKey}:{})}))].map(file=>[file.id,file])).values()];
+  state.purgedDemoIds=[...new Set([...state.purgedDemoIds,...expired.filter(file=>file.source==='demo').map(file=>file.id)])];
+  state.files=state.files.filter(file=>!ids.has(file.id));
+  state.history=state.history.map(event=>({...event,fileIds:event.fileIds.filter(id=>!ids.has(id)),before:event.before.filter(file=>!ids.has(file.id)),after:(event.after||[]).filter(file=>!ids.has(file.id)),afterRevision:Object.fromEntries(Object.entries(event.afterRevision).filter(([id])=>!ids.has(id)))})).filter(event=>event.fileIds.length);
+  state.saved=state.saved.filter(id=>!ids.has(id));state.recent=state.recent.filter(id=>!ids.has(id));
+  state.analysis.ids=state.analysis.ids.filter(id=>!ids.has(id));
+  const current=state.review.ids[state.review.cursor],position=state.review.cursor;
+  state.review.ids=state.review.ids.filter(id=>!ids.has(id));state.review.deferred=state.review.deferred.filter(id=>!ids.has(id));
+  state.review.cursor=state.review.ids.includes(current)?state.review.ids.indexOf(current):Math.min(position,state.review.ids.length);
+  if(!state.files.some(file=>file.project===state.session.project))state.session.project=state.files[0]?.project||'';
+  chooseNext();refreshRecommendations(state,clock,projects);persist();return clone(expired);
  }
  function chooseNext() {
   if(!state.files.some(f=>f.id===state.resumeId&&f.decision==='pending'))state.resumeId=state.files.find(f=>f.decision==='pending')?.id||null;
  }
+ const purgedOnStart=purgeExpiredTrash();
+ // Persist recovered timestamps once so legacy items do not receive a fresh deadline each visit.
+ if(!purgedOnStart.length&&restoredRaw&&JSON.stringify(restoredRaw)!==JSON.stringify(state))persist();
  return {
   getState,
+  purgeExpiredTrash,
+  // Cleanup is retryable: callers acknowledge only after IndexedDB deletion succeeds.
+  takePurgedFiles(){return clone(state.pendingPurgedFiles);},
+  ackPurgedFiles(ids){const done=new Set(Array.isArray(ids)?ids:[ids]),remaining=state.pendingPurgedFiles.filter(file=>!done.has(file.id));if(remaining.length!==state.pendingPurgedFiles.length){state.pendingPurgedFiles=remaining;persist();}},
   getPrivacy(){return clone(state.privacy);},
   setPrivacy(types){
    if(!types||typeof types!=='object'||Array.isArray(types))return clone(state.privacy);
@@ -243,10 +300,11 @@ export function createWorkspace(options={}) {
    state.session.project=project;persist();return true;
   },
   loadDemo(){
+   purgeExpiredTrash();
    const existing=new Set(state.files.filter(f=>f.source==='demo').map(f=>f.id));
    for(const file of state.files.filter(f=>f.source==='demo')){file.collection=file.collection||file.project;file.project=DEMO_PROJECT;}
    state.session.project=DEMO_PROJECT;
-   const records=FILES.filter(f=>!existing.has(f.id)).map(f=>makeDemoRecord(f,timestamp()));
+   const records=FILES.filter(f=>!existing.has(f.id)&&!state.purgedDemoIds.includes(f.id)).map(f=>makeDemoRecord(f,timestamp()));
    const result=addRecords(records,FILES.length-records.length);
    if(!records.length){refreshRecommendations(state,timestamp(),new Set([DEMO_PROJECT]));persist();}
    return result;
@@ -288,21 +346,31 @@ export function createWorkspace(options={}) {
   setAnalysisStep(step){if(state.analysis.status!=='pending')return;state.analysis.step=Math.max(0,Math.min(3,Number.isFinite(Number(step))?Math.floor(Number(step)):0));persist();},
   finishAnalysis(){if(state.analysis.status==='idle')return;state.analysis.status='done';state.analysis.step=3;chooseNext();persist();},
   decide(ids,decision,clarification=null){
+   purgeExpiredTrash();
    if(!DECISIONS.has(decision))return null;
    const idSet=new Set(Array.isArray(ids)?ids:[ids]),context=safeClarification(clarification);
    const files=state.files.filter(f=>idSet.has(f.id)&&(f.decision!==decision||JSON.stringify(f.clarification)!==JSON.stringify(context)));
    if(!files.length)return null;
    const event={id:uid('event'),at:timestamp(),fileIds:files.map(f=>f.id),action:context?'clarify':decision,before:files.map(snapshot),afterRevision:{},undone:false};
-   for(const file of files){file.decision=decision;file.clarification=context?clone(context):null;file.revision++;file.updatedAt=event.at;event.afterRevision[file.id]=file.revision;}
+   for(const file of files){applyLifecycle(file,decision,event.at,file.decision===decision?{archivedAt:file.archivedAt,trashedAt:file.trashedAt}:null);file.decision=decision;file.clarification=context?clone(context):null;file.revision++;file.updatedAt=event.at;event.afterRevision[file.id]=file.revision;}
    event.after=files.map(snapshot);
    state.history.unshift(event);refreshRecommendations(state,timestamp(),new Set(files.map(f=>f.project)));chooseNext();persist();return clone(event);
   },
+  restoreFiles(ids){
+   purgeExpiredTrash();
+   const chosen=new Set(Array.isArray(ids)?ids:[ids]),files=state.files.filter(file=>chosen.has(file.id)&&!isActiveFile(file));
+   if(!files.length)return null;
+   const event={id:uid('event'),at:timestamp(),fileIds:files.map(file=>file.id),action:'restore-files',before:files.map(snapshot),afterRevision:{},undone:false};
+   for(const file of files){applyLifecycle(file,'pending',event.at);file.decision='pending';file.revision++;file.updatedAt=event.at;event.afterRevision[file.id]=file.revision;}
+   event.after=files.map(snapshot);state.history.unshift(event);refreshRecommendations(state,timestamp(),new Set(files.map(file=>file.project)));chooseNext();persist();return clone(event);
+  },
   canUndo,
   undo(eventId){
+   purgeExpiredTrash();
    if(!canUndo(eventId))return null;
    const event=state.history.find(e=>e.id===eventId),files=event.fileIds.map(id=>state.files.find(f=>f.id===id));
    const restore={id:uid('event'),at:timestamp(),fileIds:[...event.fileIds],action:'restore',sourceEventId:event.id,before:files.map(snapshot),afterRevision:{},undone:false};
-   for(const file of files){const previous=event.before.find(b=>b.id===file.id);file.decision=previous.decision;file.clarification=safeClarification(previous.clarification);file.revision++;file.updatedAt=restore.at;restore.afterRevision[file.id]=file.revision;}
+   for(const file of files){const previous=event.before.find(b=>b.id===file.id);applyLifecycle(file,previous.decision,restore.at,previous);file.decision=previous.decision;file.clarification=safeClarification(previous.clarification);file.revision++;file.updatedAt=restore.at;restore.afterRevision[file.id]=file.revision;}
    restore.after=files.map(snapshot);event.undone=true;state.history.unshift(restore);
    // Rebase only the immediately preceding active action onto the restored revision.
    // Its original result snapshot remains immutable for the activity timeline.

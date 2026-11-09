@@ -1,6 +1,7 @@
 import {recommendationDetails,recommendationTags} from './recommendation-ui.js';
 import {BUCKETS, formatStorage, searchFiles} from './data.js';
 import {rankFiles} from './mode-model.js';
+import {isActiveFile} from './file-lifecycle.js';
 import {createRibbonRing} from './bubble-ring.js';
 import {createOverviewSequence} from './quick-loading.js';
 import {createPreviewQueue,previewTrashTargets,previewAfterTrash} from './quick-preview-model.js';
@@ -31,8 +32,8 @@ export function createQuickMode({root,getFiles,getState,thumb,fileArt,hydrateArt
  const dialog=document.createElement('dialog');
  dialog.className='qc-preview-dialog';dialog.setAttribute('aria-labelledby','qc-preview-name');document.body.append(dialog);
  dialog.addEventListener('keydown',e=>{if(/TEXTAREA|SELECT/.test(e.target.tagName)||(e.target.tagName==='INPUT'&&e.target.type!=='checkbox')||e.target.closest('.rec-popover'))return;if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();movePreview(e.key==='ArrowLeft'?-1:1);}});
- const files=()=>rankFiles(getFiles());
- const selectable=f=>f.decision!=='trash';
+ const files=()=>rankFiles(getFiles().filter(isActiveFile));
+ const selectable=isActiveFile;
  const visible=()=>searchFiles(query,files().filter(f=>!bucket||f.bucket===bucket));
  const choiceFiles=()=>files().filter(f=>selected.has(f.id)&&selectable(f));
  function syncSelection(){
@@ -40,7 +41,7 @@ export function createQuickMode({root,getFiles,getState,thumb,fileArt,hydrateArt
   if(project!==nextProject){selected.clear();bucket='';query='';project=nextProject;if(dialog.open)dialog.close();}
   const valid=new Set(files().filter(selectable).map(f=>f.id));selected=new Set([...selected].filter(id=>valid.has(id)));
  }
- function setSelected(id,checked){if(checked)selected.add(id);else selected.delete(id);updateSelection();}
+ function setSelected(id,checked){if(checked&&files().some(f=>f.id===id))selected.add(id);else selected.delete(id);updateSelection();}
  function takeAction(ids,decision){
   const valid=new Set(getFiles().filter(selectable).map(f=>f.id));const chosen=[...new Set(ids)].filter(id=>valid.has(id));
   if(!chosen.length)return;
@@ -61,7 +62,9 @@ export function createQuickMode({root,getFiles,getState,thumb,fileArt,hydrateArt
   if(!previewIds.length)return;renderPreview();dialog.showModal();
  }
  function movePreview(direction){
-  const next=previewIndex+direction;if(next<0||next>=previewIds.length)return;
+  const available=new Set(files().map(f=>f.id));let next=previewIndex+direction;
+  while(next>=0&&next<previewIds.length&&!available.has(previewIds[next]))next+=direction;
+  if(next<0||next>=previewIds.length)return;
   previewIndex=next;renderPreview({focusTarget:direction<0?'[data-prev]':'[data-next]'});
  }
  function updatePreviewActions(){
@@ -174,6 +177,7 @@ export function createQuickMode({root,getFiles,getState,thumb,fileArt,hydrateArt
   $('[data-qc-archive]').onclick=()=>takeAction([...selected],'archive');
   $('[data-qc-trash]').onclick=()=>takeAction([...selected],'trash');
   renderRows();
+  if(dialog.open&&!files().some(f=>f.id===previewIds[previewIndex]))renderPreview();
   if(animate)sequence.start(all,{reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches});else setPhase('ready');
  }
  return {render,deactivate(){sequence.cancel();ringUI?.destroy();ringUI=null;setPhase('ready');},clearSelection(){selected.clear();if(dialog.open)dialog.close();updateSelection();},closePreview(){if(dialog.open)dialog.close();}};

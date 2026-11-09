@@ -1,5 +1,6 @@
 import {suggestionBadge,recommendationDetails,recommendationTags} from './recommendation-ui.js';
 import { TYPES, BUCKETS, searchFiles } from './data.js';
+import {isActiveFile} from './file-lifecycle.js';
 
 /** Project-scoped, deliberate browsing. Recommendations never overwrite a decision. */
 export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateArt,prettySize,escapeHtml,onDecide,onReview,onOpenFile,onBack,onSave}) {
@@ -16,7 +17,7 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
     pin:'m8 3 8 0-1 6 4 4H5l4-4-1-6 M12 13v8',search:'M17 17l4 4 M19 10.5a8.5 8.5 0 1 1-17 0 8.5 8.5 0 0 1 17 0'
   };
   const icon=name=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${icons[name]}"/></svg>`;
-  const currentFiles=()=>getFiles();
+  const currentFiles=()=>getFiles().filter(isActiveFile);
   const lookup=id=>currentFiles().find(f=>f.id===id);
   const decision=f=>`<span class="explore-decision" data-state="${esc(f.decision)}">${stateLabels[f.decision]||'To review'}</span>`;
   const relevantFiles=()=>{
@@ -47,7 +48,7 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
   q('.explore-review-all').onclick=()=>{const files=relevantFiles().filter(f=>f.decision!=='trash');if(files.length)onReview?.(files.map(f=>f.id),files[0].id,{...filters});};
   q('.explore-clear').onclick=()=>{selected.clear();render();};
   q('.explore-review-selection').onclick=()=>{const files=currentFiles().filter(f=>selected.has(f.id));if(files.length)onReview?.(files.map(f=>f.id),files[0].id,{...filters});};
-  q('.explore-compare').onclick=()=>{if(selected.size<2)return;compareOpen=true;renderComparison();compareDialog.showModal();};
+  q('.explore-compare').onclick=openComparison;
   q('[data-detail-close]').onclick=()=>detailDialog.close();
   q('[data-compare-close]').onclick=()=>compareDialog.close();
   detailDialog.addEventListener('close',()=>{detailId=null;});
@@ -58,6 +59,7 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
   detailDialog.addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;if(e.key==='ArrowLeft'){e.preventDefault();moveDetail(-1);}if(e.key==='ArrowRight'){e.preventDefault();moveDetail(1);}});
 
   function select(id,checked) {
+    if(checked&&!lookup(id))return false;
     if(checked&&selected.size>=3&&!selected.has(id)){q('.explore-status').textContent='Compare up to three files at a time.';return false;}
     if(checked)selected.add(id);else selected.delete(id);
     renderSelection();
@@ -74,11 +76,12 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
   }
   function actions(f,clarify=true){return `<div class="explore-file-actions">${(clarify?['keep','archive','trash','undecided']:['keep','archive','trash']).map(name=>`<button type="button" data-decision="${name}" data-id="${esc(f.id)}" aria-label="${name==='undecided'?'Clarify':name[0].toUpperCase()+name.slice(1)} ${esc(f.file)}" class="${f.decision===name?'is-current':''}">${icon(name)}<span>${name==='undecided'?'Clarify':name[0].toUpperCase()+name.slice(1)}</span></button>`).join('')}</div>`;}
   function bindActions(container){
-    container.querySelectorAll('[data-decision]').forEach(button=>button.onclick=()=>{onDecide?.([button.dataset.id],button.dataset.decision);render();});
-    container.querySelectorAll('[data-original]').forEach(button=>button.onclick=()=>onOpenFile?.(button.dataset.original));
-    container.querySelectorAll('[data-save]').forEach(button=>button.onclick=()=>{onSave?.(button.dataset.save);render();});
+    container.querySelectorAll('[data-decision]').forEach(button=>button.onclick=()=>{if(!lookup(button.dataset.id))return;onDecide?.([button.dataset.id],button.dataset.decision);render();});
+    container.querySelectorAll('[data-original]').forEach(button=>button.onclick=()=>{if(lookup(button.dataset.original))onOpenFile?.(button.dataset.original);});
+    container.querySelectorAll('[data-save]').forEach(button=>button.onclick=()=>{if(!lookup(button.dataset.save))return;onSave?.(button.dataset.save);render();});
   }
   function showDetail(id){
+    if(!lookup(id))return;
     detailId=id;renderDetail();
     if(!detailDialog.open)detailDialog.showModal();
   }
@@ -95,7 +98,11 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
     q('.explore-detail-body').innerHTML=`<div class="explore-detail-art explore-art">${fileArt(f)}</div><div class="explore-detail-copy"><div class="explore-file-state">${decision(f)}${onSave?`<button class="explore-save" data-save="${esc(f.id)}" aria-pressed="${!!saved}" aria-label="${saved?'Unpin':'Pin'} ${esc(f.file)}">${icon('pin')}<span>${saved?'Pinned':'Pin'}</span></button>`:''}</div><h2 id="explore-detail-title">${esc(f.file)}</h2><p class="explore-file-location">${esc(f.project)}${f.collection?' / '+esc(f.collection):''}</p><div class="explore-metadata"><span>${esc(f.app)}</span><span>${prettySize(f)}</span><span>${esc(f.modified)}</span></div><div class="explore-insight">${recommendationDetails(f,{showBadge:true})}</div>${actions(f)}<div class="explore-detail-links"><button class="explore-original" type="button" data-original="${esc(f.id)}">${icon('open')} Open file</button><button class="explore-add-compare" type="button" aria-pressed="${selected.has(f.id)}">${icon('compare')} ${selected.has(f.id)?'Selected for comparison':'Add to comparison'}</button></div><div class="explore-detail-compare-link" ${selected.size<2?'hidden':''}><button type="button">Compare ${selected.size} files →</button></div></div>`;
     hydrateArt?.(q('.explore-detail-art'),f);bindActions(q('.explore-detail-body'));
     q('.explore-add-compare').onclick=()=>{if(select(f.id,!selected.has(f.id)))renderDetail();};
-    q('.explore-detail-compare-link button').onclick=()=>{detailDialog.close();compareOpen=true;renderComparison();compareDialog.showModal();};
+    q('.explore-detail-compare-link button').onclick=openComparison;
+  }
+  function openComparison(){
+    if(currentFiles().filter(f=>selected.has(f.id)).length<2)return;
+    if(detailDialog.open)detailDialog.close();compareOpen=true;renderComparison();compareDialog.showModal();
   }
   function renderComparison(){
     const files=currentFiles().filter(f=>selected.has(f.id));

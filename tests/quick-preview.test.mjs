@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createPreviewQueue,previewTrashTargets,previewAfterTrash} from '../dist/quick-preview-model.js';
 import {createWorkspace} from '../dist/workspace.js';
 
-const files=[{id:'first',decision:'pending'},{id:'second',decision:'archive'},{id:'current',decision:'pending'},{id:'trashed',decision:'trash'}];
+const files=[{id:'first',decision:'pending'},{id:'second',decision:'keep'},{id:'current',decision:'pending'},{id:'trashed',decision:'trash'}];
 
 test('individual preview starts at the clicked file and retains the filtered list order',()=>{
  const scope=[files[1],files[2]];
@@ -61,4 +61,15 @@ test('real workspace Trash updates supply the next preview and remain undoable',
  assert.equal(ws.getState().files.find(file=>file.id===second).decision,'pending');
  assert.ok(ws.undo(event.id));
  assert.equal(ws.getState().files.find(file=>file.id===first).decision,'pending');
+});
+
+
+test('archived and trashed files cannot enter preview queues or deletion selections',()=>{
+ const closed=[{id:'archived',decision:'archive'},{id:'trashed',decision:'trash'}];
+ const mixed=[files[0],...closed,files[2]];
+ assert.deepEqual(createPreviewQueue(mixed),{ids:['first','current'],index:0});
+ assert.deepEqual(createPreviewQueue(mixed,'archived'),{ids:[],index:0});
+ assert.deepEqual(previewTrashTargets(mixed,'current',['archived','trashed','first']),{ids:['current'],batch:false});
+ assert.deepEqual(previewTrashTargets(mixed,'archived',[]),{ids:[],batch:false});
+ assert.deepEqual(previewAfterTrash(['first','archived','current','trashed'],'first',mixed.map(f=>f.id==='first'?{...f,decision:'trash'}:f)),{ids:['current'],index:0});
 });

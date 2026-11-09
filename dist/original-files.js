@@ -1,7 +1,7 @@
 // Originals stay in this browser. This module never sends files to a server or
 // tries to launch an installed application through an untrusted URL scheme.
 export const ORIGINAL_LIMITS=Object.freeze({persistentBytes:50*1024*1024});
-const memory=new Map(),persistence=new Map(),objectUrls=new Set();
+const memory=new Map(),persistence=new Map(),objectUrls=new Map(),deletedIds=new Set();
 const RASTER_TYPES={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif',avif:'image/avif',bmp:'image/bmp'};
 const TEXT_EXTENSIONS=new Set(['txt','md','csv','json','jsonl','log','yaml','yml','xml','js','ts','css','py']);
 const UNSAFE_EXTENSIONS=new Set(['svg','svgz','html','htm','xhtml','mhtml','mht']);
@@ -46,8 +46,9 @@ async function save(id,file){
  });
 }
 async function read(id){
+ if(deletedIds.has(id))return null;
  if(memory.has(id))return memory.get(id);
- const db=await openDatabase();if(!db)return null;
+ const db=await openDatabase();if(!db||deletedIds.has(id))return null;
  return new Promise(resolve=>{
   let done=false;
   const finish=value=>{if(done)return;done=true;clearTimeout(timer);resolve(value);};
@@ -56,6 +57,7 @@ async function read(id){
    const request=db.transaction('files','readonly').objectStore('files').get(id);
    request.onsuccess=()=>{
     const value=request.result;
+    if(deletedIds.has(id)){finish(null);return;}
     if(value?.blob instanceof Blob){memory.set(id,value);persistence.set(id,true);finish(value);}else finish(null);
    };
    request.onerror=()=>finish(null);
@@ -64,10 +66,10 @@ async function read(id){
 }
 export async function registerOriginal(id,file){
  if(!validId(id)||!(file instanceof Blob))return {persisted:false,reason:'invalid-file'};
- memory.set(id,{blob:file,name:file.name||'file',lastModified:file.lastModified||0});
+ deletedIds.delete(id);memory.set(id,{blob:file,name:file.name||'file',lastModified:file.lastModified||0});
  persistence.set(id,false);
  if(file.size>ORIGINAL_LIMITS.persistentBytes)return {persisted:false,reason:'session-only-large-file'};
- const persisted=await save(id,file);persistence.set(id,persisted);
+ const persisted=await save(id,file);if(deletedIds.has(id))return {persisted:false,reason:'removed'};persistence.set(id,persisted);
  return {persisted,reason:persisted?'saved-on-this-device':'session-only-storage-unavailable'};
 }
 function matchesRecord(value,record){
@@ -82,7 +84,7 @@ export async function originalAvailability(id,record){
  return {available:!!value&&matchesRecord(value,record),persisted:persistence.get(id)===true};
 }
 function closeWindow(target){try{target?.close();}catch{}}
-function rememberUrl(blob){const url=URL.createObjectURL(blob);objectUrls.add(url);return url;}
+function rememberUrl(blob,id){const url=URL.createObjectURL(blob);objectUrls.set(url,id);return url;}
 function download(url,name){
  const link=document.createElement('a');link.href=url;link.download=String(name||'file').replace(/[\x00-\x1f\x7f/\\]/g,'_');link.rel='noopener';link.hidden=true;document.body.append(link);link.click();link.remove();
  // Give the browser time to read the download before releasing the URL.
@@ -93,14 +95,28 @@ export async function openOriginal(id,record={}){
  let target;
  try{target=globalThis.window?.open('about:blank','_blank');if(target){target.opener=null;target.document.title='Opening file…';}}catch{}
  const value=validId(id)?await read(id):null;
- if(!value||!matchesRecord(value,record)){closeWindow(target);return {ok:false,kind:'missing',reason:'Select the original file again to open it.'};}
+ if(deletedIds.has(id)||!value||!matchesRecord(value,record)){closeWindow(target);return {ok:false,kind:'missing',reason:'Select the original file again to open it.'};}
  const file={name:value.name,type:value.blob.type},disposition=originalDisposition(file);
  try{
-  const blob=value.blob.slice(0,value.blob.size,disposition.mime),url=rememberUrl(blob);
+  const blob=value.blob.slice(0,value.blob.size,disposition.mime),url=rememberUrl(blob,id);
   if(disposition.kind==='view'&&target&&!target.closed){target.location.replace(url);return {ok:true,kind:'view',persisted:persistence.get(id)===true};}
   closeWindow(target);download(url,value.name);
   return {ok:true,kind:'download',persisted:persistence.get(id)===true,reason:disposition.kind==='view'?'Browser blocked the tab; downloaded the original instead.':'Open this downloaded file in its design application.'};
  }catch{closeWindow(target);return {ok:false,kind:'missing',reason:'Could not open this file. Select the original again.'};}
 }
-export function revokeOriginalUrls(){for(const url of objectUrls)URL.revokeObjectURL(url);objectUrls.clear();}
+export async function deleteStoredOriginals(values=[]){
+ const ids=[...new Set((Array.isArray(values)?values:[]).filter(validId))];
+ for(const id of ids){deletedIds.add(id);memory.delete(id);persistence.delete(id);}
+ const deleted=new Set(ids);for(const [url,id] of objectUrls)if(deleted.has(id)){URL.revokeObjectURL(url);objectUrls.delete(url);}
+ if(!ids.length)return {ok:true,deleted:0,failedIds:[]};
+ const db=await openDatabase();
+ if(!db){if(globalThis.indexedDB)databasePromise=undefined;return {ok:!globalThis.indexedDB,deleted:ids.length,failedIds:globalThis.indexedDB?ids:[]};}
+ const ok=await new Promise(resolve=>{
+  let finished=false,tx;const done=value=>{if(finished)return;finished=true;clearTimeout(timer);resolve(value);};
+  const timer=setTimeout(()=>{try{tx?.abort();}catch{}done(false);},3000);
+  try{tx=db.transaction('files','readwrite');const store=tx.objectStore('files');for(const id of ids)store.delete(id);tx.oncomplete=()=>done(true);tx.onerror=tx.onabort=()=>done(false);}catch{done(false);}
+ });
+ return {ok,deleted:ids.length,failedIds:ok?[]:ids};
+}
+export function revokeOriginalUrls(){for(const url of objectUrls.keys())URL.revokeObjectURL(url);objectUrls.clear();}
 if(typeof globalThis.addEventListener==='function')globalThis.addEventListener('pagehide',revokeOriginalUrls);

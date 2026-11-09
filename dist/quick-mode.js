@@ -144,7 +144,11 @@ export function createQuickMode({root,getFiles,getState,thumb,fileArt,hydrateArt
   const data=overviewData(),active=data.groups.find(b=>b.id===bucket);
   ringUI?.update({...data,selected:bucket,metric,phase:root.dataset.phase||'ready'});
   $('.qc-summary').dataset.bucket=bucket;
-  $('.qc-summary-copy').innerHTML=active?`<button class="qc-project-total" type="button" aria-label="Project total: ${esc(formatStorage(data.totalSize))}, ${data.totalCount} ${data.totalCount===1?'file':'files'}. Show all files." title="Back to all files"><span>Project total</span><strong>${esc(formatStorage(data.totalSize))}</strong><span class="qc-total-count">${data.totalCount} ${data.totalCount===1?'file':'files'}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 7M4 4v6h6"/></svg></button>`:`<strong>${number(esc(formatStorage(data.potential)))}</strong><span>potential to clear</span>`;
+  const countLabel=n=>`${n} ${n===1?'file':'files'}`;
+  const primary=metric==='files'?countLabel(data.totalCount):formatStorage(data.totalSize);
+  const secondary=metric==='files'?formatStorage(data.totalSize):countLabel(data.totalCount);
+  const potential=metric==='files'?countLabel(data.pendingTrash.length):formatStorage(data.potential);
+  $('.qc-summary-copy').innerHTML=active?`<button class="qc-project-total" type="button" aria-label="Project total: ${esc(primary)}, ${esc(secondary)}. Show all files." title="Back to all files"><span>Project total</span><strong>${esc(primary)}</strong><span class="qc-total-secondary">${esc(secondary)}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 7M4 4v6h6"/></svg></button>`:`<strong>${number(esc(potential))}</strong><span>${metric==='files'?'to clear':'potential to clear'}</span>`;
   $('.qc-project-total')?.addEventListener('click',()=>{clearFilters();$('.qc-metric [aria-pressed="true"]').focus({preventScroll:true});});
   const suggested=$('[data-qc-suggested]');suggested.disabled=!data.pendingTrash.length;suggested.hidden=!!bucket&&bucket!=='trash';suggested.innerHTML=`Select suggested Trash <span class="qc-final-meta">(${data.pendingTrash.length})</span><span aria-hidden="true">↘</span>`;
   root.querySelectorAll('[data-qc-metric]').forEach(b=>b.setAttribute('aria-pressed',String(metric===b.dataset.qcMetric)));

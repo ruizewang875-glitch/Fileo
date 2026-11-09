@@ -340,7 +340,7 @@ function batchDecision(ids,decision,{preservePreview=false,onApplied}={}){
 }
 async function openSourceFile(id){const f=currentFiles().find(f=>f.id===id);if(!f)return;if(f.source==='demo'){notify('Demo preview only. Add an original file to open it.');return;}const result=await openOriginal(id,f);if(!result.ok){originalRepairId=id;notify('Select the original file to reconnect it.');$('#file-input').click();}else if(result.kind==='download')notify(`Downloaded — open with ${f.app}.`);}
 const quickUI=createQuickMode({root:$('#quick-view'),getFiles:currentFiles,getState:state,thumb,badge,fileArt,hydrateArt,prettySize,escapeHtml:esc,onDecide:batchDecision});
-const exploreUI=createExploreMode({root:$('#browse-view'),getFiles:currentFiles,getState:state,thumb,badge,fileArt,hydrateArt,prettySize,escapeHtml:esc,onDecide:batchDecision,onReview:(ids,focus,filters)=>beginReview(ids,focus,hash({...route,...filters})),onOpenFile:openSourceFile,onBack:()=>navigate({page:'explore'}),onSave:id=>{ws.toggleSaved(id);refreshCurrent();}});
+const exploreUI=createExploreMode({root:$('#browse-view'),getFiles:currentFiles,getState:state,thumb,badge,fileArt,hydrateArt,prettySize,escapeHtml:esc,onDecide:batchDecision,onReview:(ids,focus,filters)=>beginReview(ids,focus,hash({...route,...filters})),onOpenFile:openSourceFile,onBack:()=>navigate({page:'explore'}),onTypeChange:type=>navigate({page:'browse',type}),onSave:id=>{ws.toggleSaved(id);refreshCurrent();}});
 const feedbackUI=installSuggestionFeedback({
  getFile:id=>currentFiles().find(f=>f.id===id),
  onRate:(id,rating)=>ws.setSuggestionFeedback(id,{rating}),

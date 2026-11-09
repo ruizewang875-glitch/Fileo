@@ -3,15 +3,15 @@ import {feedbackControl} from './suggestion-feedback.js';
 import {TYPES, BUCKETS, searchFiles} from './data.js';
 import {isActiveFile} from './file-lifecycle.js';
 import {previewTrashTargets,previewAfterTrash} from './quick-preview-model.js';
-import {similarFiles,comparisonFinding,timelineGroups} from './explore-model.js';
+import {similarFiles,comparisonFinding,timelineGroups,groupSimilarFiles} from './explore-model.js';
 
 /** Deliberate, project-scoped browsing. Suggestions and file actions stay separate. */
-export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateArt,prettySize,escapeHtml:esc,onDecide,onOpenFile,onBack}) {
+export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateArt,prettySize,escapeHtml:esc,onDecide,onOpenFile,onBack,onTypeChange}) {
   const selected=new Set();
   let filters={type:'',bucket:'',q:'',view:''},scope=null,detailId=null,detailIds=[];
   let timelineOpen=false,timelineAnchor=null,timelineFrame=0,compareIds=[],comparePage=0,compareOpen=false;
   const viewLabels={pending:'To review',keep:'Kept',saved:'Pinned files',recent:'Recently opened',continue:'To review',duplicates:'Suggested duplicates'};
-  const paths={compare:'M3 5h7v14H3z M14 5h7v14h-7z',timeline:'M6 3v18 M10 5h10 M10 12h7 M10 19h10 M4 5h4 M4 12h4 M4 19h4',open:'M14 3h7v7 M21 3 10 14 M10 4H4v16h16v-6',search:'M17 17l4 4 M19 10.5a8.5 8.5 0 1 1-17 0 8.5 8.5 0 0 1 17 0',prev:'M20 12H4m7-7-7 7 7 7',next:'M4 12h16m-7-7 7 7-7 7',check:'m5 12 4 4L19 6'};
+  const paths={compare:'M4 7h16m-4-4 4 4-4 4 M20 17H4m4-4-4 4 4 4',timeline:'M6 3v18 M10 5h10 M10 12h7 M10 19h10 M4 5h4 M4 12h4 M4 19h4',open:'M14 3h7v7 M21 3 10 14 M10 4H4v16h16v-6',search:'M17 17l4 4 M19 10.5a8.5 8.5 0 1 1-17 0 8.5 8.5 0 0 1 17 0',prev:'M20 12H4m7-7-7 7 7 7',next:'M4 12h16m-7-7 7 7-7 7',check:'m5 12 4 4L19 6'};
   const icon=name=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name]}"/></svg>`;
   const spark='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1c1.4 6.3 4.7 9.6 11 11-6.3 1.4-9.6 4.7-11 11C10.6 16.7 7.3 13.4 1 12 7.3 10.6 10.6 7.3 12 1Z"/></svg>';
   const category=f=>{const b=BUCKETS.find(b=>b.id===f.bucket)||BUCKETS.find(b=>b.id==='undecided');return `<span class="explore-category" data-bucket="${b.id}" aria-label="AI suggestion: ${b.label}">${spark}<span>AI · ${b.label}</span></span>`;};
@@ -25,19 +25,29 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
   const relevantFiles=()=>{
     const state=getState(),view=filters.view;
     const matchesView=f=>!view||(['pending','keep'].includes(view)?f.decision===view:view==='continue'?f.decision==='pending':view==='saved'?state.saved?.includes(f.id):view==='recent'?state.recent?.includes(f.id):view==='duplicates'?f.bucket==='trash':true);
-    return searchFiles(filters.q,currentFiles().filter(f=>(!filters.type||f.type===filters.type)&&(!filters.bucket||f.bucket===filters.bucket)&&matchesView(f))).sort((a,b)=>view==='recent'?(state.recent||[]).indexOf(a.id)-(state.recent||[]).indexOf(b.id):b.modified.localeCompare(a.modified)||a.file.localeCompare(b.file));
+    const found=searchFiles(filters.q,currentFiles().filter(f=>(!filters.type||f.type===filters.type)&&(!filters.bucket||f.bucket===filters.bucket)&&matchesView(f)));
+    return view==='recent'?found.sort((a,b)=>(state.recent||[]).indexOf(a.id)-(state.recent||[]).indexOf(b.id)):groupSimilarFiles(found);
   };
 
   root.classList.add('explore-workspace');
-  root.innerHTML=`<div class="explore-top"><button class="explore-back" type="button">← Explore</button><form class="explore-search" role="search">${icon('search')}<input type="search" placeholder="Find a file…" aria-label="Search project files"><button type="submit" aria-label="Search project files">↗</button></form></div>
-    <div class="explore-heading"><div><h1></h1><span class="explore-count"></span><button class="explore-view-chip" type="button" hidden></button></div></div>
+  root.innerHTML=`<div class="explore-top"><button class="explore-back" type="button" aria-label="Back to Explore">${icon('prev')}Explore</button><form class="explore-search" role="search">${icon('search')}<input type="search" placeholder="Find a file…" aria-label="Search project files"><button type="submit" aria-label="Search project files">↗</button></form></div>
+    <div class="explore-heading"><div><h1></h1><span class="explore-count"></span><button class="explore-view-chip" type="button" hidden></button></div><button class="explore-next-type" type="button" hidden><span></span>${icon('next')}</button></div>
     <div class="explore-filters" role="group" aria-label="Filter by AI suggestion"></div><div class="explore-grid"></div>
     <div class="explore-empty" hidden><span>⌕</span><p>No matching files</p><button class="secondary-button" type="button">Clear filters</button></div>
-    <div class="explore-selection" hidden><div class="explore-selection-files"></div><span class="explore-selection-count"></span><button class="explore-clear" type="button">Clear</button><button class="explore-review-selection" type="button">Browse selection →</button><button class="explore-compare" type="button">${icon('compare')}<span>Compare</span></button></div>
+    <div class="explore-selection" hidden><div class="explore-selection-files"></div><span class="explore-selection-count"></span><button class="explore-clear" type="button">Clear</button><button class="explore-review-selection" type="button">Preview selection <span aria-hidden="true">↗</span></button><button class="explore-selection-archive explore-secondary" type="button">Archive</button><button class="explore-selection-trash explore-primary" type="button">Move to Trash</button></div>
     <p class="explore-status sr-only" role="status" aria-live="polite"></p>
     <dialog class="explore-detail-dialog" aria-labelledby="explore-detail-title"><div class="explore-preview-layout"><div class="explore-preview-main"></div><aside class="explore-timeline" aria-label="Project timeline" hidden><div class="explore-timeline-heading"><h3>Timeline</h3><button type="button" class="explore-modal-close" data-timeline-close aria-label="Close timeline">×</button></div><div class="explore-timeline-scroll" tabindex="0" aria-label="Scroll the project timeline"></div></aside></div></dialog>
-    <dialog class="explore-compare-dialog" aria-labelledby="explore-compare-title"><div class="explore-compare-heading"><div><h2 id="explore-compare-title">Side by side</h2><span class="explore-compare-summary" role="status" aria-live="polite"></span></div><button class="explore-modal-close" type="button" data-compare-close aria-label="Close comparison">×</button></div><div class="explore-comparison-stage"><button class="explore-preview-nav explore-compare-prev" type="button" data-compare-prev aria-label="Previous comparison files">${icon('prev')}</button><div class="explore-compare-columns"></div><button class="explore-preview-nav explore-compare-next" type="button" data-compare-next aria-label="Next comparison files">${icon('next')}</button></div><div class="explore-compare-batch" hidden></div><div class="explore-comparison-finding">${spark}<p></p></div></dialog>`;
+    <dialog class="explore-compare-dialog" aria-labelledby="explore-compare-title"><div class="explore-compare-heading"><div><h2 id="explore-compare-title">Side by side</h2><span class="explore-compare-summary" role="status" aria-live="polite"></span></div><button class="explore-modal-close" type="button" data-compare-close aria-label="Close comparison">×</button></div><div class="explore-comparison-stage"><button class="explore-preview-nav explore-compare-prev" type="button" data-compare-prev aria-label="Previous comparison files">${icon('prev')}</button><div class="explore-compare-columns"></div><button class="explore-preview-nav explore-compare-next" type="button" data-compare-next aria-label="Next comparison files">${icon('next')}</button></div><div class="explore-compare-batch" hidden></div><div class="explore-comparison-finding">${spark}<div><span class="explore-finding-label">AI insight</span><p></p></div></div></dialog>`;
   const detailDialog=q('.explore-detail-dialog'),compareDialog=q('.explore-compare-dialog');
+  let timelineHeight=0;
+  const timelineScroll=q('.explore-timeline-scroll');
+  const resizeTimeline=()=>{
+    const height=timelineScroll.clientHeight;if(!height||height===timelineHeight)return;
+    timelineHeight=height;timelineScroll.style.setProperty('--timeline-viewport-height',height+'px');
+    if(timelineOpen&&detailDialog.open){if(timelineFrame)cancelAnimationFrame(timelineFrame);timelineFrame=requestAnimationFrame(()=>{timelineFrame=0;centerTimeline();});}
+  };
+  if(typeof ResizeObserver==='function')new ResizeObserver(resizeTimeline).observe(timelineScroll);
+  function centerTimeline(){const scroll=timelineScroll,item=scroll.querySelector('.is-current');if(!timelineOpen||!detailDialog.open||!item)return;const r=item.getBoundingClientRect(),s=scroll.getBoundingClientRect();scroll.scrollTop+=r.top-s.top-(scroll.clientHeight-r.height)/2;timelineAnchor=detailId;}
   q('.explore-back').onclick=()=>onBack?.();
   q('.explore-view-chip').onclick=()=>{filters.view='';render();};
   q('.explore-search').onsubmit=e=>{e.preventDefault();filters.q=q('.explore-search input').value.trim();render();};
@@ -45,7 +55,9 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
   q('.explore-empty button').onclick=()=>{filters={...filters,bucket:'',q:'',view:''};render();};
   q('.explore-clear').onclick=()=>{selected.clear();syncSelection();};
   q('.explore-review-selection').onclick=()=>{const files=queueFiles([...selected]);if(files.length)showDetail(files[0].id,files);};
-  q('.explore-compare').onclick=()=>openComparison(queueFiles([...selected]));
+  q('.explore-selection-archive').onclick=()=>takeAction([...selected],'archive');
+  q('.explore-selection-trash').onclick=()=>takeAction([...selected],'trash');
+  q('.explore-next-type').onclick=()=>{const type=nextType();if(!type)return;clearSelection();filters={type:type.id,bucket:'',q:'',view:''};if(onTypeChange)onTypeChange(type.id);else render();};
   q('[data-compare-close]').onclick=()=>compareDialog.close();
   q('[data-compare-prev]').onclick=()=>moveComparison(-1);
   q('[data-compare-next]').onclick=()=>moveComparison(1);
@@ -64,8 +76,8 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
     q('.explore-selection').hidden=!files.length;
     q('.explore-selection-count').textContent=`${files.length} selected`;
     q('.explore-selection-files').innerHTML=files.slice(0,3).map(f=>`<span class="explore-mini" title="${esc(f.file)}">${thumb(f)}</span>`).join('');
-    q('.explore-compare').disabled=files.length<2;
-    q('.explore-compare span').textContent=files.length<2?'Compare':`Compare ${files.length}`;
+    q('.explore-review-selection').disabled=!files.length;
+    q('.explore-selection-archive').disabled=!files.length;q('.explore-selection-trash').disabled=!files.length;
     root.querySelectorAll('[data-select]').forEach(input=>{input.checked=selected.has(input.dataset.select);input.closest('.explore-file-card')?.classList.toggle('is-selected',input.checked);});
     const f=lookup(detailId),trash=q('[data-detail-trash]');
     if(f&&trash){const targets=previewTrashTargets(currentFiles(),f.id,selected);trash.textContent=targets.batch?`Move ${targets.ids.length} files to Trash`:'Move to Trash';trash.setAttribute('aria-label',targets.batch?`Move ${targets.ids.length} selected files to Trash`:`Move ${f.file} to Trash`);}
@@ -120,7 +132,7 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
     const position=scroll.scrollTop,shouldCenter=timelineAnchor!==detailId,groups=timelineGroups(currentFiles());
     scroll.innerHTML=groups.map(group=>`<section class="explore-timeline-day"><time>${esc(group.date)}</time><div>${group.files.map(f=>`<button type="button" class="explore-timeline-entry ${f.id===detailId?'is-current':''}" data-timeline-file="${esc(f.id)}" ${f.id===detailId?'aria-current="true"':''} aria-label="View ${esc(f.file)} from ${esc(group.date)}"><span class="explore-timeline-thumb">${thumb(f)}</span><span class="explore-timeline-info"><strong>${esc(f.file)}</strong><span>${esc(f.app)} · ${esc(prettySize(f))}</span></span></button>`).join('')}</div></section>`).join('');
     scroll.querySelectorAll('[data-timeline-file]').forEach(button=>button.onclick=()=>{detailIds=groups.flatMap(g=>g.files.map(f=>f.id));detailId=button.dataset.timelineFile;renderDetail();});
-    timelineFrame=requestAnimationFrame(()=>{timelineFrame=0;if(!timelineOpen||!detailDialog.open)return;timelineAnchor=detailId;const item=scroll.querySelector('.is-current');if(shouldCenter&&item){const r=item.getBoundingClientRect(),s=scroll.getBoundingClientRect();scroll.scrollTop+=r.top-s.top-(scroll.clientHeight-r.height)/2;}else scroll.scrollTop=position;});
+    timelineFrame=requestAnimationFrame(()=>{timelineFrame=0;if(!timelineOpen||!detailDialog.open)return;scroll.style.setProperty('--timeline-viewport-height',scroll.clientHeight+'px');timelineHeight=scroll.clientHeight;if(shouldCenter)centerTimeline();else scroll.scrollTop=position;});
   }
   function openComparison(files,automatic=false){
     compareIds=[...new Set(files.filter(isActiveFile).map(f=>f.id))];if(!compareIds.length)return;
@@ -148,6 +160,13 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
     bindSelect(columns);renderCompareBatch();
     q('.explore-comparison-finding p').textContent=files.length?comparisonFinding(visible):'These files have been moved out of your workspace. You can restore them from History.';
   }
+  function nextType(){
+    if(!filters.type)return null;
+    const present=new Set(currentFiles().map(f=>f.type)),known=TYPES.filter(t=>present.has(t.id));
+    const unknown=[...present].filter(id=>!TYPES.some(t=>t.id===id)).sort().map(id=>({id,app:currentFiles().find(f=>f.type===id)?.app||'.'+id}));
+    const available=[...known,...unknown],index=available.findIndex(t=>t.id===filters.type);
+    return available.length>1?available[(index+1)%available.length]:null;
+  }
   function render(options){
     const files=currentFiles(),nextScope=getState().session?.project||files[0]?.project||'';
     if(scope!==null&&scope!==nextScope){clearSelection();filters={type:'',bucket:'',q:'',view:''};}scope=nextScope;
@@ -156,6 +175,8 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
     const found=relevantFiles(),type=TYPES.find(t=>t.id===filters.type);
     q('.explore-heading h1').textContent=filters.type?(type?.app||'.'+filters.type)+' files':'Your project, up close';
     q('.explore-count').textContent=found.length+' '+(found.length===1?'file':'files');
+    const next=nextType();q('.explore-next-type').hidden=!next;
+    if(next){q('.explore-next-type span').textContent='Next: '+next.app;q('.explore-next-type').setAttribute('aria-label','Next file type: '+next.app);}
     q('.explore-view-chip').hidden=!filters.view;q('.explore-view-chip').textContent=(viewLabels[filters.view]||filters.view)+' ×';
     q('.explore-search input').value=filters.q;
     q('.explore-filters').innerHTML='<span>AI suggestion</span>'+[{id:'',label:'All'},...BUCKETS].map(b=>`<button type="button" data-filter="${b.id}" aria-pressed="${filters.bucket===b.id}">${b.id?`<i data-bucket="${b.id}"></i>`:''}${esc(b.label)}</button>`).join('');

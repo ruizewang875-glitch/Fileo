@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {similarFiles,comparisonFinding,timelineGroups} from '../dist/explore-model.js';
+import {similarFiles,comparisonFinding,timelineGroups,groupSimilarFiles} from '../dist/explore-model.js';
 import {FILES} from '../dist/data.js';
 
 const demo=FILES.map(file=>({...file,collection:file.project,project:'Studio semester',source:'demo',decision:'pending'}));
@@ -97,4 +97,52 @@ test('timeline falls back to valid imported timestamps and deduplicates IDs',()=
  const groups=timelineGroups([imported,imported,{id:'bad',modified:'2026-02-30'},{id:'bad-month',modified:'2026-99-99'}]);
  assert.deepEqual(groups.map(group=>group.date),['2026-10-21','Unknown date']);
  assert.equal(groups[0].files.length,1);
+});
+
+
+test('grid keeps exact copies adjacent despite interleaved modification dates',()=>{
+ const main={...file('alpine_afterglow.psd'),modified:'2026-10-01'};
+ const copy={...file('alpine_afterglow_copy.psd'),modified:'2026-10-20'};
+ const unrelated={...file('nora_lounge_v04.3dm'),modified:'2026-10-15'};
+ const variant={...file('dawn_grading_v02.psd'),modified:'2026-09-01'};
+ const input=[unrelated,variant,copy,main],before=structuredClone(input);
+ assert.deepEqual(groupSimilarFiles(input).map(f=>f.id),[main.id,copy.id,variant.id,unrelated.id]);
+ assert.deepEqual(input,before);
+ assert.deepEqual(groupSimilarFiles([...input].reverse()).map(f=>f.id),groupSimilarFiles(input).map(f=>f.id));
+});
+
+test('grid groups visual families without turning a shared collection into one group',()=>{
+ const input=[
+  {...file('nora_lounge_v04.3dm'),modified:'2026-11-01'},
+  {...file('nora_material_budget.xlsx'),modified:'2026-10-31'},
+  {...file('nora_lounge_final.3dm'),modified:'2026-09-01'},
+  {...file('nora_frame_test.3dm'),modified:'2026-08-01'}
+ ];
+ assert.deepEqual(groupSimilarFiles(input).map(f=>f.file),['nora_lounge_v04.3dm','nora_lounge_final.3dm','nora_frame_test.3dm','nora_material_budget.xlsx']);
+});
+
+test('grid groups local named versions and respects privacy-off preview boundaries',()=>{
+ const a={id:'a',file:'client_brand_v01.fig',type:'fig',project:'A',source:'local',modified:'2026-10-10'};
+ const b={...a,id:'b',file:'client_brand_copy.fig',modified:'2026-10-20'};
+ const c={...a,id:'c',file:'research_notes.fig',modified:'2026-10-15'};
+ assert.deepEqual(groupSimilarFiles([a,b,c]).map(f=>f.id),['a','b','c']);
+ const hidden={...a,source:'demo',previewKey:'shared.svg',previewFamily:'same',readAccess:{status:'disabled'}};
+ const peer={...c,source:'demo',previewKey:'shared.svg',previewFamily:'same'};
+ const middle={...b,file:'unrelated.fig',modified:'2026-10-12'};
+ assert.deepEqual(groupSimilarFiles([hidden,peer,middle]).map(f=>f.id),['c','b','a']);
+});
+
+test('grid does not merge projects or weak collection chains and excludes closed files',()=>{
+ const base={type:'fig',project:'A',source:'local',collection:'Work',modified:'2026-01-01'};
+ const input=[{...base,id:'a',file:'alpha_one.fig',modified:'2026-03-01'},
+  {...base,id:'other',project:'B',file:'alpha_one_copy.fig',modified:'2026-02-15'},
+  {...base,id:'b',file:'alpha_two.fig',modified:'2026-02-01'},
+  {...base,id:'c',file:'gamma_two.fig'},
+  {...base,id:'trash',file:'alpha_copy.fig',decision:'trash'},
+  {...base,id:'archive',file:'alpha_backup.fig',decision:'archive'}];
+ const result=groupSimilarFiles([...input,input[0]]);
+ assert.deepEqual(result.map(f=>f.id),['a','b','other','c']);
+ assert.deepEqual(groupSimilarFiles(input,{project:'A'}).map(f=>f.id),['a','b','c']);
+ assert.equal(new Set(result.map(f=>f.id)).size,result.length);
+ assert.deepEqual(groupSimilarFiles(null),[]);
 });

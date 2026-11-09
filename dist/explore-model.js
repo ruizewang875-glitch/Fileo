@@ -34,6 +34,58 @@ export function similarFiles(current,files=[]){
  return [anchor,...[...available.values()].filter(file=>file.id!==anchor.id).map(file=>({file,score:similarity(anchor,file)})).filter(item=>item.score>0).sort((a,b)=>b.score-a.score||byRecent(a.file,b.file)).map(item=>item.file)];
 }
 
+// Grid ordering is intentionally stronger than a plain date sort. Exact copies
+// form indivisible units; related versions then sit alongside those units. A
+// collection alone never joins unrelated documents, models and photographs.
+const formatKey=file=>lower(file.type||file.ext);
+const filenameKey=file=>filenameWords(file).join(' ');
+const gridAffinity=(a,b)=>{
+ if(!sameProject(a,b))return 0;
+ const score=similarity(a,b),sameFormat=formatKey(a)===formatKey(b);
+ if(canUsePreview(a)&&canUsePreview(b)&&a.previewFamily&&a.previewFamily===b.previewFamily)return score;
+ if(sameFormat&&score>=55)return score;
+ // Imported/reading-disabled versions can still use visible folder and name
+ // metadata. Require a shared distinctive name as well as a named collection.
+ const generic=new Set(['file','image','photo','document','untitled','design','project','export','new','studio']);
+ const aWords=filenameWords(a),bWords=filenameWords(b);
+ if(sameFormat&&text(a.collection)&&lower(a.collection)===lower(b.collection)&&aWords.length>=2&&bWords.length>=2&&aWords.some(word=>word.length>=3&&!generic.has(word)&&bWords.includes(word)))return 40;
+ return 0;
+};
+
+/** Active files, similarity-first within each project; input records are untouched. */
+export function groupSimilarFiles(input=[],{project}={}){
+ const files=[...new Map((Array.isArray(input)?input:[]).filter(file=>isActiveFile(file)&&(project===undefined||file.project===project)).map(file=>[file.id,file])).values()].sort(byRecent);
+ const parent=files.map((_,index)=>index);
+ const find=index=>{while(parent[index]!==index)index=parent[index];return index;};
+ const join=(a,b)=>{const rootA=find(a),rootB=find(b);if(rootA!==rootB)parent[rootB]=rootA;};
+ // Union only well-defined copy/version keys, never a chain of weak similarities.
+ const previewKeys=new Map(),nameKeys=new Map();
+ files.forEach((file,index)=>{
+  const scope=[text(file.project),formatKey(file)].join('\u0000');
+  const keys=[];
+  if(canUsePreview(file)&&file.previewKey)keys.push([previewKeys,scope+'\u0000'+file.previewKey]);
+  const name=filenameKey(file);if(name)keys.push([nameKeys,scope+'\u0000'+name]);
+  for(const [map,key] of keys){if(map.has(key))join(index,map.get(key));else map.set(key,index);}
+ });
+ const unitsByRoot=new Map();
+ files.forEach((file,index)=>{const root=find(index);if(!unitsByRoot.has(root))unitsByRoot.set(root,[]);unitsByRoot.get(root).push(file);});
+ const units=[...unitsByRoot.values()].map(members=>({
+  newest:[...members].sort(byRecent)[0],
+  members:[...members].sort((a,b)=>Number(copyMarker.test(a.file))-Number(copyMarker.test(b.file))||byRecent(a,b))
+ })).sort((a,b)=>byRecent(a.newest,b.newest));
+ const remaining=new Set(units),result=[];
+ for(const anchor of units){
+  if(!remaining.has(anchor))continue;
+  remaining.delete(anchor);
+  const related=[...remaining].map(unit=>({unit,score:Math.max(...anchor.members.flatMap(a=>unit.members.map(b=>gridAffinity(a,b))))})).filter(item=>item.score>0).sort((a,b)=>b.score-a.score||byRecent(a.unit.newest,b.unit.newest));
+  // Each member must relate directly to this anchor. Weak A→B→C chains do not
+  // collapse a whole project into one accidental cluster.
+  result.push(...anchor.members);
+  for(const {unit} of related){remaining.delete(unit);result.push(...unit.members);}
+ }
+ return result;
+}
+
 function exactGroups(files){
  const groups=new Map();
  for(const file of files){

@@ -10,7 +10,7 @@ import {createGeneralSettings} from './general-settings.js';
 import {createPrivacyUI} from './privacy-ui.js';
 import {PRIVACY_VERSION, PRIVACY_TYPES, isReadingAllowed} from './privacy.js';
 import {createCarousel} from './carousel.js';
-import {createQuickMode} from './quick-mode.js';
+import {createQuickMode} from './quick-mode.js?v=29';
 import {createExploreMode} from './explore-mode.js';
 import {projectFiles} from './mode-model.js';
 import {isActiveFile} from './file-lifecycle.js';

@@ -54,16 +54,56 @@ test('head arrows and curved labels follow the user-marked Keep, Archive, Trash 
  near(layout[3].arrowRotation,315);
 });
 
-test('zero and tiny categories do not grow fake shares or lose the fallback label; full-circle projects remain drawable',()=>{
+test('zero and tiny categories do not grow fake shares or lose their attached label; full-circle projects remain drawable',()=>{
  const cases=[[0,0,0,0],[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1],[.9997,.0001,.0001,.0001]];
  for(const shares of cases){
   const layout=buildRibbonLayout(groups(shares));assertFinite(layout);
   near(layout.reduce((sum,s)=>sum+s.share,0),shares.some(Boolean)?1:0);
   layout.forEach((s,i)=>{
-   if(!shares[i]){near(s.share,0);assert.equal(s.bodyPath,'');assert.equal(s.headPath,'');assert.equal(s.labelFits,false);}
+   if(!shares[i]){near(s.share,0);assert.equal(s.bodyPath,'');assert.equal(s.headPath,'');assert.equal(s.labelFits,false);assert.equal(s.calloutPath,'');}
    else if(s.share===1){assert.equal((s.bodyPath.match(/ A/g)||[]).length,4,'A full annulus needs two arcs for each edge');assert.equal(s.headPath,'');assert.ok(s.labelFits);}
-   else if(s.share<.001){assert.ok(s.bodyPath);assert.equal(s.headRadius,0);assert.equal(s.headPath,'');assert.equal(s.labelFits,false);assert.equal(s.labelPath,'');}
+   else if(s.share<.001){assert.ok(s.bodyPath);assert.equal(s.headRadius,0);assert.equal(s.headPath,'');assert.equal(s.labelFits,false);assert.equal(s.labelPath,'');assert.ok(s.calloutPath);}
   });
+ }
+});
+
+function assertAttachedCallout(segment){
+ assert.equal(segment.labelFits,false);
+ assert.ok(segment.calloutPath&&!/NaN|Infinity/.test(segment.calloutPath),'A small category must have a connector to its own arc');
+ assert.ok(Number.isFinite(segment.calloutX)&&Number.isFinite(segment.calloutY));
+ assert.ok(segment.calloutX>=0&&segment.calloutX<=1000,'Label remains within the ring view');
+ assert.ok(segment.calloutY>=0&&segment.calloutY<=580,'Label belongs beside the ring, not beneath its summary');
+ assert.ok(['start','middle','end'].includes(segment.calloutAnchor));
+ assert.ok(Math.hypot(segment.calloutX-500,segment.calloutY-288)>250,'Small category label sits outside the ring rather than covering another slice');
+}
+
+test('Free up space demo retains the 2.1% Undecided slice and an attached label',()=>{
+ // Exact catalog sizes after the preference archives older large drafts.
+ const sizes=[627.967,430.83,404.2,31.503],total=sizes.reduce((sum,n)=>sum+n,0);
+ const input=groups(sizes.map(size=>size/total));input[3].count=5;
+ const layout=buildRibbonLayout(input),undecided=layout[3],trash=layout[2];assertFinite(layout);
+ near(undecided.share,.02107929073268651);
+ near(undecided.end-undecided.start,undecided.share*Math.PI*2);
+ assert.equal(undecided.count,5);
+ assert.ok(undecided.bodyPath,'The true data slice must remain drawable');
+ assert.ok(trash.headDepth>0&&trash.headDepth<36,'The preceding cap adapts to the small neighbor');
+ assert.ok(trash.headDepth<=(undecided.end-undecided.start)*214*.35+1e-7,'The cap cannot swallow the next segment');
+ assertAttachedCallout(undecided);
+});
+
+test('small slices remain exposed after every category, including the end-to-start seam and zero neighbors',()=>{
+ for(let tinyIndex=0;tinyIndex<4;tinyIndex++){
+  const shares=[.33,.33,.33,.33];shares[tinyIndex]=.01;
+  const layout=buildRibbonLayout(groups(shares)),small=layout[tinyIndex],previous=layout[(tinyIndex+3)%4];assertFinite(layout);
+  near(small.share,.01);
+  assert.ok(previous.headDepth<=(small.end-small.start)*214*.35+1e-7,'Cap overlap is bounded across every ring boundary');
+  assertAttachedCallout(small);
+ }
+ for(const shares of [[.99,0,.01,0],[0,.99,0,.01],[.01,0,.99,0]]){
+  const layout=buildRibbonLayout(groups(shares)),small=layout[shares.indexOf(.01)],large=layout[shares.indexOf(.99)];
+  assert.ok(small&&large);
+  assert.ok(large.headDepth<=(small.end-small.start)*214*.35+1e-7,'Cap sizing skips zero-sized categories to preserve the next actual slice');
+  assertAttachedCallout(small);
  }
 });
 

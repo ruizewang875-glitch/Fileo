@@ -31,7 +31,7 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
 
   root.classList.add('explore-workspace');
   root.innerHTML=`<div class="explore-top"><button class="explore-back" type="button" aria-label="Back to Explore">${icon('prev')}Explore</button><form class="explore-search" role="search">${icon('search')}<input type="search" placeholder="Find a file…" aria-label="Search project files"><button type="submit" aria-label="Search project files">↗</button></form></div>
-    <div class="explore-heading"><div><h1></h1><span class="explore-count"></span><button class="explore-view-chip" type="button" hidden></button></div><nav class="explore-type-nav" aria-label="Browse file types" hidden><button class="explore-prev-type" type="button">${icon('prev')}<span></span></button><button class="explore-next-type" type="button"><span></span>${icon('next')}</button></nav></div>
+    <div class="explore-heading"><div><h1></h1><span class="explore-count"></span><button class="explore-view-chip" type="button" hidden></button></div><nav class="explore-type-nav" aria-label="Browse file types" hidden><button class="explore-prev-type" type="button" aria-label="Previous file type" title="Previous file type">${icon('prev')}</button><button class="explore-next-type" type="button" aria-label="Next file type" title="Next file type">${icon('next')}</button></nav></div>
     <div class="explore-filters" role="group" aria-label="Filter by AI suggestion"></div><div class="explore-grid"></div>
     <div class="explore-empty" hidden><span>⌕</span><p>No matching files</p><button class="secondary-button" type="button">Clear filters</button></div>
     <div class="explore-selection" hidden><div class="explore-selection-files"></div><span class="explore-selection-count"></span><button class="explore-clear" type="button">Clear</button><button class="explore-review-selection" type="button">Preview selection <span aria-hidden="true">↗</span></button><button class="explore-selection-archive explore-secondary" type="button">Archive</button><button class="explore-selection-trash explore-primary" type="button">Move to Trash</button></div>
@@ -179,9 +179,7 @@ export function createExploreMode({root,getFiles,getState,thumb,fileArt,hydrateA
     const found=relevantFiles(),type=TYPES.find(t=>t.id===filters.type);
     q('.explore-heading h1').textContent=filters.type?(type?.app||'.'+filters.type)+' files':'Your project, up close';
     q('.explore-count').textContent=found.length+' '+(found.length===1?'file':'files');
-    const previous=adjacentType(-1),next=adjacentType(1);q('.explore-type-nav').hidden=!next;
-    if(previous){q('.explore-prev-type span').textContent='Previous: '+previous.app;q('.explore-prev-type').setAttribute('aria-label','Previous file type: '+previous.app);}
-    if(next){q('.explore-next-type span').textContent='Next: '+next.app;q('.explore-next-type').setAttribute('aria-label','Next file type: '+next.app);}
+    q('.explore-type-nav').hidden=!adjacentType(1);
     q('.explore-view-chip').hidden=!filters.view;q('.explore-view-chip').textContent=(viewLabels[filters.view]||filters.view)+' ×';
     q('.explore-search input').value=filters.q;
     q('.explore-filters').innerHTML='<span>AI suggestion</span>'+[{id:'',label:'All'},...BUCKETS].map(b=>`<button type="button" data-filter="${b.id}" aria-pressed="${filters.bucket===b.id}">${b.id?`<i data-bucket="${b.id}"></i>`:''}${esc(b.label)}</button>`).join('');
